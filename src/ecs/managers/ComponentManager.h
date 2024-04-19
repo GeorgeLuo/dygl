@@ -2,18 +2,19 @@
 #include <unordered_map>
 #include <memory>
 #include <typeindex>
+#include "Entity.h"
+#include <array>
+#include <cassert>
+#include <unordered_set>
 
 class IComponentArray
 {
 public:
     virtual ~IComponentArray() = default;
+    virtual void RemoveComponentIfExists(Entity entity) = 0; // Pure virtual function
+
     // Define virtual methods common to all component arrays if necessary
 };
-
-#include <array>
-#include <cassert>
-#include "Entity.h"
-#include <unordered_set>
 
 template <typename T>
 class ComponentArray : public IComponentArray
@@ -49,6 +50,16 @@ public:
         // Mark that this entity no longer has this component type
         entityToComponentMapping[entity] = false;
         --componentCount;
+    }
+
+    void RemoveComponentIfExists(Entity entity) override
+    {
+        if (entity < MAX_ENTITIES && entityToComponentMapping[entity])
+        {
+            entityToComponentMapping[entity] = false;
+            --componentCount;
+            // Optionally handle additional cleanup, e.g., destructors, resetting to default values, etc.
+        }
     }
 
     // Method to get a reference to an entity's component
@@ -126,6 +137,26 @@ public:
         {
             componentArray->RemoveComponent(entity);                           // Call RemoveComponent on the ComponentArray
             entitiesByComponentType[std::type_index(typeid(T))].erase(entity); // Also remove the entity from the entitiesByComponentType mapping
+        }
+    }
+
+    void RemoveAllComponents(Entity entity)
+    {
+        // Iterate over all component types
+        for (auto &entry : componentArrays)
+        {
+            auto &componentArray = entry.second;
+            if (componentArray)
+            {
+                // Cast IComponentArray to the specific ComponentArray type is not straightforward
+                // since we don't know T here, but we can create a method in IComponentArray to handle removal safely
+                componentArray->RemoveComponentIfExists(entity);
+            }
+        }
+        // Clean up entity tracking for all component types
+        for (auto &entry : entitiesByComponentType)
+        {
+            entry.second.erase(entity);
         }
     }
 

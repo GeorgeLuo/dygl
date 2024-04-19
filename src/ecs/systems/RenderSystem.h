@@ -46,72 +46,114 @@ void CheckGLError()
 class RenderSystem : public System
 {
 public:
-    RenderSystem();
+    RenderSystem(EventBus &eventBus) : eventBus(eventBus)
+    {
+        this->eventBus.subscribe<EntityCreatedEvent>([this](const EntityCreatedEvent &event)
+                                               { this->AddEntity(event.entity); });
+
+        this->eventBus.subscribe<EntityDestroyedEvent>([this](const EntityDestroyedEvent &event)
+                                               { this->RemoveEntity(event.entity); });
+
+    }
     void Update(float dt, ComponentManager &componentManager);
     void Initialize();
     void RemoveEntity(Entity entity);
 
 private:
+    EventBus &eventBus;
+
     ShaderManager shaderManager;
+
     unsigned int geometryShaderProgram;
     unsigned int threeDShaderProgram;
     unsigned int shaderProgram;
 
+    void initializeShaders();
+
+    // per entity helpers
+    void setupGeometry(Entity entity, ComponentManager &componentManager);
     void setupShaderWithEntityData(TransformComponent &transform, float angle);
 
-    void initializeShaders()
-    {
-        geometryShaderProgram = shaderManager.LoadShaderProgram(
-            "shaders/vertex/basicTransform.vert",
-            "shaders/fragment/uniformColor.frag");
-        CheckGLError();
-
-        threeDShaderProgram = shaderManager.LoadShaderProgram(
-            "shaders/vertex/3DVertexShader.vert",
-            "shaders/fragment/3DFragmentShader.frag");
-        CheckGLError();
-    }
-
-    void setupGeometry(Entity entity, ComponentManager &componentManager)
-    {
-        if (!componentManager.HasComponent<RenderComponent>(entity))
-        {
-            unsigned int VAO, VBO;
-            glGenVertexArrays(1, &VAO);
-            glBindVertexArray(VAO);
-            glGenBuffers(1, &VBO);              // Generate VBO before using it
-            glBindBuffer(GL_ARRAY_BUFFER, VBO); // Bind the buffer
-
-            GLsizei numVertices = 0;
-            if (componentManager.HasComponent<GeometryComponent>(entity))
-            {
-                auto &geometry = componentManager.GetComponent<GeometryComponent>(entity);
-                numVertices = geometry.vertices.size();
-                glBindBuffer(GL_ARRAY_BUFFER, VBO);
-                glBufferData(GL_ARRAY_BUFFER, numVertices * sizeof(Vertex), geometry.vertices.data(), GL_STATIC_DRAW);
-            }
-            else if (componentManager.HasComponent<ThreeDComponent>(entity))
-            {
-                auto &threed = componentManager.GetComponent<ThreeDComponent>(entity);
-                numVertices = threed.vertices.size();
-                glBindBuffer(GL_ARRAY_BUFFER, VBO);
-                glBufferData(GL_ARRAY_BUFFER, numVertices * sizeof(Vertex), threed.vertices.data(), GL_STATIC_DRAW);
-            }
-            glGenBuffers(1, &VBO);
-            glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void *)0);
-            glEnableVertexAttribArray(0);
-            glBindVertexArray(0); // Unbind VAO to prevent further modifications.
-            // Store the VAO and VBO in RenderComponent
-            RenderComponent renderComponent{VAO, VBO};
-            componentManager.AddComponent(entity, renderComponent);
-            // Keep track that we've added the component to avoid duplication in future updates
-        }
-    }
+    // global properties of the scene
+    std::tuple<glm::vec3, glm::vec3> getLightProperties() const;
+    glm::mat4 getViewMatrix() const;
+    glm::mat4 getProjectionMatrix(float windowWidth, float windowHeight) const;
 };
 
-RenderSystem::RenderSystem()
+std::tuple<glm::vec3, glm::vec3> RenderSystem::getLightProperties() const
 {
+    glm::vec3 lightPos = glm::vec3(0.0f, 0.0f, 1.0f);
+    glm::vec3 lightColor = glm::vec3(1.0f, 1.0f, 1.0f);
+    return {lightPos, lightColor};
 }
+
+void RenderSystem::setupGeometry(Entity entity, ComponentManager &componentManager)
+{
+    if (!componentManager.HasComponent<RenderComponent>(entity))
+    {
+        unsigned int VAO, VBO;
+        glGenVertexArrays(1, &VAO);
+        glBindVertexArray(VAO);
+        glGenBuffers(1, &VBO);              // Generate VBO before using it
+        glBindBuffer(GL_ARRAY_BUFFER, VBO); // Bind the buffer
+
+        GLsizei numVertices = 0;
+        if (componentManager.HasComponent<GeometryComponent>(entity))
+        {
+            auto &geometry = componentManager.GetComponent<GeometryComponent>(entity);
+            numVertices = geometry.vertices.size();
+            glBindBuffer(GL_ARRAY_BUFFER, VBO);
+            glBufferData(GL_ARRAY_BUFFER, numVertices * sizeof(Vertex), geometry.vertices.data(), GL_STATIC_DRAW);
+        }
+        else if (componentManager.HasComponent<ThreeDComponent>(entity))
+        {
+            auto &threed = componentManager.GetComponent<ThreeDComponent>(entity);
+            numVertices = threed.vertices.size();
+            glBindBuffer(GL_ARRAY_BUFFER, VBO);
+            glBufferData(GL_ARRAY_BUFFER, numVertices * sizeof(Vertex), threed.vertices.data(), GL_STATIC_DRAW);
+        }
+        glGenBuffers(1, &VBO);
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void *)0);
+        glEnableVertexAttribArray(0);
+        glBindVertexArray(0); // Unbind VAO to prevent further modifications.
+        // Store the VAO and VBO in RenderComponent
+        RenderComponent renderComponent{VAO, VBO};
+        componentManager.AddComponent(entity, renderComponent);
+        // Keep track that we've added the component to avoid duplication in future updates
+    }
+}
+
+glm::mat4 RenderSystem::getProjectionMatrix(float windowWidth, float windowHeight) const
+{
+    float aspectRatio = windowWidth / windowHeight;
+    float zoomLevel = 2.0f;
+    return glm::ortho(-zoomLevel * aspectRatio, zoomLevel * aspectRatio, -zoomLevel, zoomLevel, 0.1f, 100.0f);
+}
+
+glm::mat4 RenderSystem::getViewMatrix() const
+{
+    return glm::lookAt(
+        glm::vec3(0.0f, 0.0f, 3.0f),  // Camera is here
+        glm::vec3(0.0f, 0.0f, 0.0f),  // and looks at the origin
+        glm::vec3(0.0f, 1.0f, 0.0f)); // Head is up
+}
+
+void RenderSystem::initializeShaders()
+{
+    geometryShaderProgram = shaderManager.LoadShaderProgram(
+        "shaders/vertex/basicTransform.vert",
+        "shaders/fragment/uniformColor.frag");
+    CheckGLError();
+
+    threeDShaderProgram = shaderManager.LoadShaderProgram(
+        "shaders/vertex/3DVertexShader.vert",
+        "shaders/fragment/3DFragmentShader.frag");
+    CheckGLError();
+}
+
+// RenderSystem::RenderSystem(EventBus &eventBus), eventBus(eventBus)
+// {
+// }
 
 void RenderSystem::Initialize()
 {
@@ -123,9 +165,7 @@ void RenderSystem::Initialize()
 
 void RenderSystem::Update(float dt, ComponentManager &componentManager)
 {
-    // Example light properties
-    glm::vec3 lightPos = glm::vec3(0.0f, 0.0f, 1.0f);
-    glm::vec3 lightColor = glm::vec3(1.0f, 1.0f, 1.0f);
+    auto [lightPos, lightColor] = getLightProperties();
 
     // Current time in seconds (you might need to adjust this based on how you track time in your application)
     float currentTime = glfwGetTime(); // GLFW function, assuming GLFW is being used for window management
@@ -137,39 +177,14 @@ void RenderSystem::Update(float dt, ComponentManager &componentManager)
     // glUseProgram(shaderProgram); // Use shader program
     CheckGLError();
 
-    glm::mat4 view = glm::lookAt(
-        glm::vec3(0.0f, 0.0f, 3.0f), // Camera is positioned at (0,0,3)
-        glm::vec3(0.0f, 0.0f, 0.0f), // and looks towards the origin
-        glm::vec3(0.0f, 1.0f,
-                  0.0f) // Head is up (use y-axis as the 'up' direction)
-    );
-
-    // Position the camera to the side of the scene, looking at the origin
-    // glm::vec3 cameraPos = glm::vec3(3.0f, 0.0f, 0.0f);    // Position to the side
-    // glm::vec3 cameraTarget = glm::vec3(0.0f, 0.0f, 0.0f); // Looking at the origin
-    // glm::vec3 upVector = glm::vec3(0.0f, 1.0f, 0.0f);     // Up is along Y-axis
-
-    // glm::mat4 view = glm::lookAt(cameraPos, cameraTarget, upVector);
-
-    // glm::mat4 projection =
-    //     glm::ortho(-1.0f, 1.0f, -1.0f, 1.0f, 0.1f,
-    //                100.0f); // Example: Orthographic projection for simplicity.
-    float zoomLevel = 2.0f; // Adjust this value to control zoom
+    glm::mat4 view = getViewMatrix();
 
     float windowWidth = 800;  // Example width
     float windowHeight = 600; // Example height
-    float aspectRatio = windowWidth / windowHeight;
 
     // Choose to fit the view vertically, adjust horizontally
 
-    glm::mat4 projection = glm::ortho(-zoomLevel * aspectRatio, zoomLevel * aspectRatio, -zoomLevel, zoomLevel, 0.1f, 100.0f);
-    // glm::mat4 projection = glm::perspective(glm::radians(45.0f), aspectRatio, 0.1f, 100.0f);
-
-    // // Pass view and projection matrices to the shader
-    // int viewLoc = glGetUniformLocation(shaderProgram, "view");
-    // int projectionLoc = glGetUniformLocation(shaderProgram, "projection");
-    // glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
-    // glUniformMatrix4fv(projectionLoc, 1, GL_FALSE, glm::value_ptr(projection));
+    glm::mat4 projection = getProjectionMatrix(windowWidth, windowHeight);
 
     for (auto entity : this->entities)
     {
