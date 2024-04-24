@@ -36,19 +36,19 @@ public:
     template <typename EventType>
     void subscribe(std::function<void(const EventType &)> handler)
     {
-        void *array[10];
-        size_t size;
+        // void *array[10];
+        // size_t size;
 
         // get void*'s for all entries on the stack
-        size = backtrace(array, 10);
+        // size = backtrace(array, 10);
 
         // print out all the frames to stderr
-        fprintf(stderr, "Trace of subscribe call:\n");
-        backtrace_symbols_fd(array, size, STDERR_FILENO);
+        // fprintf(stderr, "Trace of subscribe call:\n");
+        // backtrace_symbols_fd(array, size, STDERR_FILENO);
 
         handlers[typeid(EventType)].push_back([=](const Event &event)
                                               { handler(static_cast<const EventType &>(event)); });
-        std::cout << "Subscribed to event type: " << typeid(EventType).name() << std::endl;
+        // std::cout << "Subscribed to event type: " << typeid(EventType).name() << std::endl;
     }
 
     template <typename EventType>

@@ -2,7 +2,7 @@
 #include "ComponentManager.h"
 #include "EntityManager.h"
 #include "GeometryComponent.h"
-#include "ThreeDComponent.h" // Include the new ThreeDComponent header
+// #include "ThreeDComponent.h" // Include the new ThreeDComponent header
 #include "System.h"
 #include "TransformComponent.h"
 #include <glad.h>
@@ -12,7 +12,9 @@
 #include <iostream>
 #include "ShaderManager.h"
 #include "RenderComponent.h"
+#include "ShaderComponent.h"
 #include <glfw3.h>
+#include "SceneContext.h"
 
 void CheckGLError()
 {
@@ -46,14 +48,14 @@ void CheckGLError()
 class RenderSystem : public System
 {
 public:
-    RenderSystem(EventBus &eventBus) : eventBus(eventBus)
+    RenderSystem(EventBus &eventBus, SceneContext &context)
+        : eventBus(eventBus), sceneContext(context)
     {
         this->eventBus.subscribe<EntityCreatedEvent>([this](const EntityCreatedEvent &event)
-                                               { this->AddEntity(event.entity); });
+                                                     { this->AddEntity(event.entity); });
 
         this->eventBus.subscribe<EntityDestroyedEvent>([this](const EntityDestroyedEvent &event)
-                                               { this->RemoveEntity(event.entity); });
-
+                                                       { this->RemoveEntity(event.entity); });
     }
     void Update(float dt, ComponentManager &componentManager);
     void Initialize();
@@ -61,11 +63,12 @@ public:
 
 private:
     EventBus &eventBus;
+    SceneContext &sceneContext; // Reference to the shared context
 
     ShaderManager shaderManager;
 
     unsigned int geometryShaderProgram;
-    unsigned int threeDShaderProgram;
+    // unsigned int threeDShaderProgram;
     unsigned int shaderProgram;
 
     void initializeShaders();
@@ -73,19 +76,7 @@ private:
     // per entity helpers
     void setupGeometry(Entity entity, ComponentManager &componentManager);
     void setupShaderWithEntityData(TransformComponent &transform, float angle);
-
-    // global properties of the scene
-    std::tuple<glm::vec3, glm::vec3> getLightProperties() const;
-    glm::mat4 getViewMatrix() const;
-    glm::mat4 getProjectionMatrix(float windowWidth, float windowHeight) const;
 };
-
-std::tuple<glm::vec3, glm::vec3> RenderSystem::getLightProperties() const
-{
-    glm::vec3 lightPos = glm::vec3(0.0f, 0.0f, 1.0f);
-    glm::vec3 lightColor = glm::vec3(1.0f, 1.0f, 1.0f);
-    return {lightPos, lightColor};
-}
 
 void RenderSystem::setupGeometry(Entity entity, ComponentManager &componentManager)
 {
@@ -105,13 +96,6 @@ void RenderSystem::setupGeometry(Entity entity, ComponentManager &componentManag
             glBindBuffer(GL_ARRAY_BUFFER, VBO);
             glBufferData(GL_ARRAY_BUFFER, numVertices * sizeof(Vertex), geometry.vertices.data(), GL_STATIC_DRAW);
         }
-        else if (componentManager.HasComponent<ThreeDComponent>(entity))
-        {
-            auto &threed = componentManager.GetComponent<ThreeDComponent>(entity);
-            numVertices = threed.vertices.size();
-            glBindBuffer(GL_ARRAY_BUFFER, VBO);
-            glBufferData(GL_ARRAY_BUFFER, numVertices * sizeof(Vertex), threed.vertices.data(), GL_STATIC_DRAW);
-        }
         glGenBuffers(1, &VBO);
         glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void *)0);
         glEnableVertexAttribArray(0);
@@ -123,37 +107,10 @@ void RenderSystem::setupGeometry(Entity entity, ComponentManager &componentManag
     }
 }
 
-glm::mat4 RenderSystem::getProjectionMatrix(float windowWidth, float windowHeight) const
-{
-    float aspectRatio = windowWidth / windowHeight;
-    float zoomLevel = 2.0f;
-    return glm::ortho(-zoomLevel * aspectRatio, zoomLevel * aspectRatio, -zoomLevel, zoomLevel, 0.1f, 100.0f);
-}
-
-glm::mat4 RenderSystem::getViewMatrix() const
-{
-    return glm::lookAt(
-        glm::vec3(0.0f, 0.0f, 3.0f),  // Camera is here
-        glm::vec3(0.0f, 0.0f, 0.0f),  // and looks at the origin
-        glm::vec3(0.0f, 1.0f, 0.0f)); // Head is up
-}
-
 void RenderSystem::initializeShaders()
 {
-    geometryShaderProgram = shaderManager.LoadShaderProgram(
-        "shaders/vertex/basicTransform.vert",
-        "shaders/fragment/uniformColor.frag");
-    CheckGLError();
-
-    threeDShaderProgram = shaderManager.LoadShaderProgram(
-        "shaders/vertex/3DVertexShader.vert",
-        "shaders/fragment/3DFragmentShader.frag");
     CheckGLError();
 }
-
-// RenderSystem::RenderSystem(EventBus &eventBus), eventBus(eventBus)
-// {
-// }
 
 void RenderSystem::Initialize()
 {
@@ -165,7 +122,7 @@ void RenderSystem::Initialize()
 
 void RenderSystem::Update(float dt, ComponentManager &componentManager)
 {
-    auto [lightPos, lightColor] = getLightProperties();
+    auto [lightPos, lightColor] = sceneContext.getLightProperties();
 
     // Current time in seconds (you might need to adjust this based on how you track time in your application)
     float currentTime = glfwGetTime(); // GLFW function, assuming GLFW is being used for window management
@@ -177,28 +134,23 @@ void RenderSystem::Update(float dt, ComponentManager &componentManager)
     // glUseProgram(shaderProgram); // Use shader program
     CheckGLError();
 
-    glm::mat4 view = getViewMatrix();
-
-    float windowWidth = 800;  // Example width
-    float windowHeight = 600; // Example height
+    glm::mat4 view = sceneContext.viewMatrix;
 
     // Choose to fit the view vertically, adjust horizontally
-
-    glm::mat4 projection = getProjectionMatrix(windowWidth, windowHeight);
+    glm::mat4 projection = sceneContext.projectionMatrix;
 
     for (auto entity : this->entities)
     {
-        if (componentManager.HasComponent<GeometryComponent>(entity))
-        {
-            shaderProgram = geometryShaderProgram;
-        }
-        else if (componentManager.HasComponent<ThreeDComponent>(entity))
-        {
-            shaderProgram = threeDShaderProgram;
-        }
-        else
-        {
+        if (!componentManager.HasComponent<GeometryComponent>(entity))
             continue; // Skip entities without relevant components
+
+        if (componentManager.HasComponent<ShaderComponent>(entity))
+        {
+            ShaderComponent component = componentManager.GetComponent<ShaderComponent>(entity);
+            shaderProgram = shaderManager.LoadShaderProgram(
+                component.vertexShader,
+                component.fragmentShader);
+            CheckGLError();
         }
 
         glUseProgram(shaderProgram); // Use shader program
@@ -215,9 +167,9 @@ void RenderSystem::Update(float dt, ComponentManager &componentManager)
         glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
         glUniformMatrix4fv(projectionLoc, 1, GL_FALSE, glm::value_ptr(projection));
 
-        if (!(componentManager.HasComponent<GeometryComponent>(entity) || componentManager.HasComponent<ThreeDComponent>(entity)))
+        if (!(componentManager.HasComponent<GeometryComponent>(entity)))
             continue; // Skip entities without geometry or 3D components
-        // Transform and setup geometry as before. The method now checks both component types.
+
         TransformComponent transform;
         if (componentManager.HasComponent<TransformComponent>(entity))
         {
@@ -225,7 +177,7 @@ void RenderSystem::Update(float dt, ComponentManager &componentManager)
         }
         setupShaderWithEntityData(transform, angle);
         setupGeometry(entity, componentManager);
-        // Check for ColorComponent; use default color if not available
+
         glm::vec4 color = {1.0f, 1.0f, 1.0f, 1.0f}; // Default color: white
         if (componentManager.HasComponent<ColorComponent>(entity))
         {
@@ -245,11 +197,6 @@ void RenderSystem::Update(float dt, ComponentManager &componentManager)
             auto &geometry = componentManager.GetComponent<GeometryComponent>(entity);
             numVertices = geometry.vertices.size();
         }
-        else if (componentManager.HasComponent<ThreeDComponent>(entity))
-        {
-            auto &threed = componentManager.GetComponent<ThreeDComponent>(entity);
-            numVertices = threed.vertices.size();
-        }
         glDrawArrays(GL_TRIANGLES, 0, numVertices); // Use the appropriate number of vertices here
         CheckGLError();
     }
@@ -257,8 +204,6 @@ void RenderSystem::Update(float dt, ComponentManager &componentManager)
 
 void RenderSystem::RemoveEntity(Entity entity)
 {
-    // Remove the entity from the system’s update list
-    // entities.erase(std::remove(entities.begin(), entities.end(), entity), entities.end());
     entities.erase(entity);
 }
 
@@ -266,13 +211,19 @@ void RenderSystem::setupShaderWithEntityData(TransformComponent &transform, floa
 {
     glm::mat4 modelMatrix = transform.GetModelMatrix(); // Start with the original transform
 
-    if (shaderProgram == threeDShaderProgram)
+    // if (shaderProgram == threeDShaderProgram)
     {
-        // Apply additional rotation to the model matrix based on the current time
+        // New diagonal axis for rotation (e.g., (1, 1, 1))
+        glm::vec3 diagonalAxis(1.0f, 1.0f, 1.0f); // Diagonal axis combining X, Y, and Z
+
+        // Normalize the axis to ensure uniform rotation
+        diagonalAxis = glm::normalize(diagonalAxis);
+
+        // Apply the rotation
         modelMatrix = glm::rotate(
             modelMatrix,                 // Start with the current model matrix
             glm::radians(angle * 50.0f), // Angle of rotation (radians per second)
-            glm::vec3(0.0f, 1.0f, 0.0f)  // Axis of rotation (Y-axis here)
+            diagonalAxis                 // Diagonal axis for rotation
         );
     }
 

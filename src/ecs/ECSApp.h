@@ -1,20 +1,15 @@
 #pragma once
 #include "ComponentManager.h"
-#include "ConcurrentQueue.h"
 #include "EntityManager.h"
 #include "RenderSystem.h"
 #include <glad.h> // Include GLAD before GLFW.
 #include <glfw3.h>
 #include <iostream>
 #include <tuple>
-#include "ColorComponent.h"
-#include "TagComponent.h"
 #include "QueueCollection.h"
-#include "IdComponent.h"
-#include "ChangeColorCommand.h"
-#include "ThreeDComponent.h"
 #include "MessageSystem.h"
 #include "EventBus.h"
+#include "InputSystem.h"
 
 class OpenGLApp
 {
@@ -32,12 +27,40 @@ public:
 
     QueueCollection &queueCollection;
 
+    SceneContext context;
+
     OpenGLApp(QueueCollection &queueCollection)
         : queueCollection(queueCollection),
           entityManager(eventBus),
-          renderSystem(eventBus),
-          messageSystem(entityManager, componentManager, queueCollection, eventBus)
+          context(SceneContext(800, 600)),
+          renderSystem(eventBus, context),
+          //   messageSystem(entityManager, componentManager, queueCollection, eventBus)
+          inputSystem(entityManager, componentManager),
+          messageSystem(entityManager, componentManager, queueCollection)
     {
+    }
+
+    void initialize()
+    {
+        // Register the static callback function
+        glfwSetMouseButtonCallback(window, OpenGLApp::staticMouseButtonCallback);
+    }
+
+    static void staticMouseButtonCallback(GLFWwindow *window, int button, int action, int mods)
+    {
+        OpenGLApp *app = static_cast<OpenGLApp *>(glfwGetWindowUserPointer(window)); // Get the instance
+        if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS)
+        {
+            double xpos, ypos;
+            glfwGetCursorPos(window, &xpos, &ypos);        // Get mouse position
+            app->inputSystem.handleMouseClick(xpos, ypos); // Access the instance method
+        }
+    }
+
+    void setupWindow()
+    {
+        // Set the window user pointer to 'this' for the static callback to reference
+        glfwSetWindowUserPointer(window, this);
     }
 
     static void framebuffer_size_callback(GLFWwindow *window, int width, int height)
@@ -64,6 +87,8 @@ public:
             exit(-1);
         }
         glfwMakeContextCurrent(window);
+        setupWindow();
+        initialize();
 
         // GLAD: load all OpenGL function pointers
         if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
@@ -84,9 +109,7 @@ public:
             glClear(GL_COLOR_BUFFER_BIT);
 
             messageSystem.Update(0.016f);
-
-            // Update the RenderSystem - this will handle all rendering for entities it knows about
-            renderSystem.Update(0.016f, componentManager); // For this example, assuming a fixed timestep
+            renderSystem.Update(0.016f, componentManager);
 
             glfwSwapBuffers(window);
             glfwPollEvents();
@@ -98,4 +121,5 @@ public:
 
 private:
     GLFWwindow *window;
+    InputSystem inputSystem;
 };

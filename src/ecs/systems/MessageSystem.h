@@ -6,7 +6,12 @@
 #include "TagComponent.h"
 #include "System.h"
 #include <tuple>
-#include "EventBus.h"
+// #include "EventBus.h"
+#include "IdComponent.h"
+#include "EntityCreationMessageV2.h"
+#include "ShaderComponent.h"
+#include "ThreeDComponent.h"
+// #include "UniformComponent.h"
 
 class MessageSystem : public System
 {
@@ -14,21 +19,91 @@ public:
     EntityManager &entityManager;
     ComponentManager &componentManager;
     QueueCollection &queueCollection;
-    EventBus &eventBus;
+    // EventBus &eventBus;
 
     std::unordered_map<int, Entity> idToEntityMap;
 
-    MessageSystem(EntityManager &entityManager, ComponentManager &componentManager, QueueCollection &queueCollection, EventBus &eventBus)
-        : entityManager(entityManager), componentManager(componentManager), queueCollection(queueCollection), eventBus(eventBus) {}
+    // MessageSystem(EntityManager &entityManager, ComponentManager &componentManager, QueueCollection &queueCollection, EventBus &eventBus)
+    //     : entityManager(entityManager), componentManager(componentManager), queueCollection(queueCollection), eventBus(eventBus) {}
+
+    MessageSystem(EntityManager &entityManager, ComponentManager &componentManager, QueueCollection &queueCollection)
+        : entityManager(entityManager), componentManager(componentManager), queueCollection(queueCollection) {}
 
     void Update(float deltaTime) override
     {
         ProcessCreationMessages();
+        ProcessCreationV2Messages();
+        ProcessDeletionV2Messages();
         ProcessDeletionMessages();
         ProcessColorChangeMessages();
     }
 
 private:
+    void ProcessCreationV2Messages()
+    {
+        std::vector<EntityCreationMessageV2> creationMessages;
+        while (queueCollection.entityCreationV2Queue.TryPop(creationMessages))
+        {
+            for (const auto &message : creationMessages)
+            {
+                auto it = idToEntityMap.find(message.id);
+                if (it != idToEntityMap.end())
+                {
+                    Entity entity = it->second;
+                    componentManager.RemoveAllComponents(entity);
+                    entityManager.DestroyEntity(entity);
+                    idToEntityMap.erase(it);
+                }
+
+                Entity newEntity = entityManager.CreateEntity();
+                componentManager.AddComponent(newEntity, IdComponent(message.id));
+                componentManager.AddComponent(newEntity, TransformComponent(message.transform.position[0],
+                                                                            message.transform.position[1],
+                                                                            message.transform.position[2],
+                                                                            message.transform.scale[0],
+                                                                            message.transform.scale[1],
+                                                                            message.transform.scale[2],
+                                                                            message.transform.rotation[0],
+                                                                            message.transform.rotation[1],
+                                                                            message.transform.rotation[2]));
+
+                std::vector<float> vertices = message.uniforms.floatUniforms.at("vertices");
+                std::vector<Vertex> shapeVertices;
+                for (size_t i = 0; i < vertices.size(); i += 3)
+                {
+                    shapeVertices.push_back(Vertex(vertices[i], vertices[i + 1], vertices[i + 2]));
+                }
+
+                GeometryComponent shapeGeometry(shapeVertices);
+                componentManager.AddComponent(newEntity, shapeGeometry);
+
+                TagComponent tagComponent;
+                tagComponent.AddTag("shape");
+                componentManager.AddComponent(newEntity, tagComponent);
+
+                ShaderComponent shaderComponent(message.shaders.vertexShader, message.shaders.fragmentShader);
+                componentManager.AddComponent(newEntity, shaderComponent);
+
+                ColorComponent colorComponent(message.uniforms.floatUniforms.at("color")[0],
+                                              message.uniforms.floatUniforms.at("color")[1],
+                                              message.uniforms.floatUniforms.at("color")[2]);
+
+                componentManager.AddComponent(newEntity, colorComponent);
+
+                // UniformComponent uniformComponent;
+                // uniformComponent.setModelMatrix(message.uniforms.floatUniforms.at("modelMatrix"));
+                // uniformComponent.setColor(message.uniforms.floatUniforms.at("color"));
+                // componentManager.AddComponent(newEntity, uniformComponent);
+
+                idToEntityMap[message.id] = newEntity;
+            }
+        }
+    }
+
+    void ProcessDeletionV2Messages()
+    {
+    }
+
     void ProcessCreationMessages()
     {
         std::vector<EntityCreationMessage> creationMessages;
@@ -44,9 +119,6 @@ private:
 
                 // Initialize the TransformComponent based on message position
                 componentManager.AddComponent(newEntity, TransformComponent(message.x, message.y, message.z));
-
-                TagComponent tagComponent;
-                tagComponent.AddTag("shape");
 
                 if (message.shape == "square")
                 {
@@ -116,9 +188,6 @@ private:
                     ThreeDComponent cubeComponent(cubeVertices);
                     componentManager.AddComponent(newEntity, cubeComponent);
                 }
-                componentManager.AddComponent(newEntity, tagComponent);
-
-                // renderSystem.AddEntity(newEntity);
 
                 idToEntityMap[message.id] = newEntity;
             }
@@ -136,16 +205,7 @@ private:
                 if (it != idToEntityMap.end())
                 {
                     Entity entity = it->second;
-
-                    // Inform RenderSystem about the entity being removed
-                    // renderSystem.RemoveEntity(entity); // Assuming RenderSystem has a method RemoveEntity
-
-                    // Remove the associated components, for example:
-                    // componentManager.RemoveComponent<RenderComponent>(entity);
                     componentManager.RemoveAllComponents(entity);
-                    // Repeat the above line for other component types the entity may have
-
-                    // Now, properly destroy the entity and remove from the map
                     entityManager.DestroyEntity(entity);
                     idToEntityMap.erase(it);
                 }
