@@ -303,7 +303,12 @@ void ClientThread()
         {-0.75f, 0.75f, 0.0f, "pyramid"},
         {0.75f, 0.75f, 0.0f, "square"},
         {0.75f, -0.75f, 0.0f, "triangle"},
-        {-0.75f, -0.75f, 0.0f, "cube"}};
+        {-0.75f, -0.75f, 0.0f, "cube"},
+        {2.0f, 2.0f, 0.0f, "pyramid"},
+        {2.0f, -2.0f, 0.0f, "square"},
+        {1.5f, 1.0f, 0.0f, "triangle"},
+        {-1.5f, 2.0f, 0.0f, "cube"}
+        };
     // {-0.75f, 0.75f, 0.0f, "triangle"},
     // {0.75f, 0.75f, 0.0f, "square"},
     // {0.75f, -0.75f, 0.0f, "triangle"},
@@ -360,7 +365,9 @@ void ClientThread()
         if (action == 1)
         {
             // Attempt to add a random entity if not already active
+            // int entityId = rand() % entityDefinitions.size();
             int entityId = rand() % entityDefinitions.size();
+
             if (activeEntities.find(entityId) == activeEntities.end())
             {
                 // const auto &def = entityDefinitions[entityId];
@@ -411,7 +418,7 @@ void ClientThread()
         // waitForAck(sock);
 
         close(sock);                                                  // Close the socket after sending message
-        std::this_thread::sleep_for(std::chrono::milliseconds(1000)); // Throttle message sending
+        std::this_thread::sleep_for(std::chrono::milliseconds(200)); // Throttle message sending
     }
 }
 

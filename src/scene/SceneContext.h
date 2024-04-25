@@ -8,17 +8,12 @@ class SceneContext
 public:
     glm::mat4 viewMatrix;
     glm::mat4 projectionMatrix;
+    glm::vec3 cameraPosition;
+    float windowWidth, windowHeight;
 
-    SceneContext(float windowWidth, float windowHeight)
+    SceneContext(float windowWidth, float windowHeight, glm::vec3 cameraPosition) : windowWidth(windowWidth), windowHeight(windowHeight), cameraPosition(cameraPosition)
     {
-        initializeMatrices(windowWidth, windowHeight); // Default initialization
-    }
-
-    glm::mat4 getProjectionMatrix(float windowWidth, float windowHeight) const
-    {
-        float aspectRatio = windowWidth / windowHeight;
-        float zoomLevel = 2.0f;
-        return glm::ortho(-zoomLevel * aspectRatio, zoomLevel * aspectRatio, -zoomLevel, zoomLevel, 0.1f, 100.0f);
+        initializeMatrices(windowWidth, windowHeight, cameraPosition); // Default initialization
     }
 
     std::tuple<glm::vec3, glm::vec3> getLightProperties() const
@@ -28,10 +23,17 @@ public:
         return {lightPos, lightColor};
     }
 
-    void initializeMatrices(float windowWidth, float windowHeight)
+    glm::mat4 getProjectionMatrix(float windowWidth, float windowHeight) const
+    {
+        float aspectRatio = windowWidth / windowHeight;
+        float zoomLevel = 2.0f;
+        return glm::ortho(-zoomLevel * aspectRatio, zoomLevel * aspectRatio, -zoomLevel, zoomLevel, 0.1f, 100.0f);
+    }
+
+    void initializeMatrices(float windowWidth, float windowHeight, glm::vec3 cameraPosition)
     {
         viewMatrix = glm::lookAt(
-            glm::vec3(0.0f, 0.0f, 3.0f),                                   // Camera is here
+            cameraPosition,                                                // Camera is here
             glm::vec3(0.0f, 0.0f, 0.0f),                                   // and looks at the origin
             glm::vec3(0.0f, 1.0f, 0.0f));                                  // Head is up
         projectionMatrix = getProjectionMatrix(windowWidth, windowHeight); // Example initialization

@@ -32,10 +32,10 @@ public:
     OpenGLApp(QueueCollection &queueCollection)
         : queueCollection(queueCollection),
           entityManager(eventBus),
-          context(SceneContext(800, 600)),
+          context(SceneContext(800, 600, glm::vec3(0.0f, 0.0f, 3.0f))),
           renderSystem(eventBus, context),
           //   messageSystem(entityManager, componentManager, queueCollection, eventBus)
-          inputSystem(entityManager, componentManager),
+          inputSystem(entityManager, componentManager, context),
           messageSystem(entityManager, componentManager, queueCollection)
     {
     }

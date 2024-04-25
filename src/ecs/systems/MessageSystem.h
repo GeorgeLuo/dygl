@@ -77,9 +77,9 @@ private:
                 GeometryComponent shapeGeometry(shapeVertices);
                 componentManager.AddComponent(newEntity, shapeGeometry);
 
-                TagComponent tagComponent;
-                tagComponent.AddTag("shape");
-                componentManager.AddComponent(newEntity, tagComponent);
+                // TagComponent tagComponent;
+                // tagComponent.AddTag("shape");
+                // componentManager.AddComponent(newEntity, tagComponent);
 
                 ShaderComponent shaderComponent(message.shaders.vertexShader, message.shaders.fragmentShader);
                 componentManager.AddComponent(newEntity, shaderComponent);
