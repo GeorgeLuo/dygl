@@ -3,7 +3,7 @@
 #include "SelectCommand.h"
 #include "EntityManager.h"
 
-class InputSystem
+class MouseSystem
 {
 
 public:
@@ -14,23 +14,25 @@ public:
     void handleMouseClick(double xpos, double ypos);
     void handleMouseMove(double xpos, double ypos);
     void handleMouseRelease();
-    InputSystem(EntityManager &entityManager, ComponentManager &componentManager, SceneContext &sceneContext) : entityManager(entityManager), componentManager(componentManager), sceneContext(sceneContext)
+    MouseSystem(EntityManager &entityManager, ComponentManager &componentManager, SceneContext &sceneContext) : entityManager(entityManager), componentManager(componentManager), sceneContext(sceneContext)
     {
     }
 };
 
-void InputSystem::handleMouseClick(double xpos, double ypos)
+void MouseSystem::handleMouseClick(double xpos, double ypos)
 {
     SelectCommand selectCommand(componentManager, xpos, ypos, sceneContext.windowWidth, sceneContext.windowHeight, sceneContext.viewMatrix, sceneContext.projectionMatrix, sceneContext.cameraPosition); // Create the command
     selectCommand.execute();                                                                                                                                                                             // Execute the command
 }
 
-void InputSystem::handleMouseMove(double xpos, double ypos)
+void MouseSystem::handleMouseRelease()
 {
-    // Generate a command for dragging an entity
+    DeselectCommand deselectCommand(componentManager); // Create the command
+    deselectCommand.execute();                         // Execute the command
 }
 
-void InputSystem::handleMouseRelease()
+void MouseSystem::handleMouseMove(double xpos, double ypos)
 {
-    // Generate a command for releasing the entity
+    MoveCommand moveCommand(componentManager, xpos, ypos, sceneContext.windowWidth, sceneContext.windowHeight, sceneContext.viewMatrix, sceneContext.projectionMatrix, sceneContext.cameraPosition);
+    moveCommand.execute();
 }

@@ -9,7 +9,7 @@
 #include "QueueCollection.h"
 #include "MessageSystem.h"
 #include "EventBus.h"
-#include "InputSystem.h"
+#include "MouseSystem.h"
 
 class OpenGLApp
 {
@@ -32,10 +32,10 @@ public:
     OpenGLApp(QueueCollection &queueCollection)
         : queueCollection(queueCollection),
           entityManager(eventBus),
-          context(SceneContext(800, 600, glm::vec3(0.0f, 0.0f, 3.0f))),
+          context(SceneContext(800, 600, glm::vec3(0.0f, 0.0f, 5.0f))),
           renderSystem(eventBus, context),
           //   messageSystem(entityManager, componentManager, queueCollection, eventBus)
-          inputSystem(entityManager, componentManager, context),
+          mouseSystem(entityManager, componentManager, context),
           messageSystem(entityManager, componentManager, queueCollection)
     {
     }
@@ -44,6 +44,7 @@ public:
     {
         // Register the static callback function
         glfwSetMouseButtonCallback(window, OpenGLApp::staticMouseButtonCallback);
+        glfwSetCursorPosCallback(window, OpenGLApp::cursorPositionCallback);
     }
 
     static void staticMouseButtonCallback(GLFWwindow *window, int button, int action, int mods)
@@ -53,8 +54,19 @@ public:
         {
             double xpos, ypos;
             glfwGetCursorPos(window, &xpos, &ypos);        // Get mouse position
-            app->inputSystem.handleMouseClick(xpos, ypos); // Access the instance method
+            app->mouseSystem.handleMouseClick(xpos, ypos); // Access the instance method
         }
+
+        if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_RELEASE)
+        {
+            app->mouseSystem.handleMouseRelease();
+        }
+    }
+
+    static void cursorPositionCallback(GLFWwindow *window, double xpos, double ypos)
+    {
+        OpenGLApp *app = static_cast<OpenGLApp *>(glfwGetWindowUserPointer(window));
+        app->mouseSystem.handleMouseMove(xpos, ypos);
     }
 
     void setupWindow()
@@ -77,6 +89,7 @@ public:
 #ifdef __APPLE__
         glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE); // For macOS
 #endif
+        glfwWindowHint(GLFW_DEPTH_BITS, 24); // Or 16, 32, etc., depending on desired precision
         window = glfwCreateWindow(800, 600, "Render System Usage", NULL, NULL);
         glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
 
@@ -101,12 +114,15 @@ public:
 
     void Run()
     {
+        glEnable(GL_DEPTH_TEST); // Enable depth testing
+        glDepthFunc(GL_LESS);    // Specify that closer objects obscure farther ones
+
         glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
 
         // Rendering loop
         while (!glfwWindowShouldClose(window))
         {
-            glClear(GL_COLOR_BUFFER_BIT);
+            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
             messageSystem.Update(0.016f);
             renderSystem.Update(0.016f, componentManager);
@@ -121,5 +137,5 @@ public:
 
 private:
     GLFWwindow *window;
-    InputSystem inputSystem;
+    MouseSystem mouseSystem;
 };

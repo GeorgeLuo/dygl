@@ -12,6 +12,20 @@ class Raycaster
 public:
     Raycaster() {}
 
+    glm::vec3 getPointOnVirtualPlane(const glm::vec3 &rayDirection, const glm::vec3 &cameraPosition, float planeDepth)
+    {
+        // Assuming the virtual plane is perpendicular to the camera's forward vector and at a distance (depth) from the camera
+        // For simplicity and without loss of generality, consider planeDepth is along the camera's forward (-Z) direction in camera/view space
+
+        // Calculate point on the plane by extending rayDirection
+        glm::vec3 planeNormal = glm::normalize(cameraPosition); // Assuming camera looking towards -Z
+        float d = glm::dot((cameraPosition + planeNormal * planeDepth) - cameraPosition, planeNormal) / glm::dot(rayDirection, planeNormal);
+
+        glm::vec3 pointOnPlane = cameraPosition + rayDirection * d; // This gives us the target position in world space
+
+        return pointOnPlane;
+    }
+
     glm::vec3 screenToWorld(double screenX, double screenY, int screenWidth, int screenHeight, glm::mat4 view, glm::mat4 projection)
     {
         float x = (2.0f * screenX) / screenWidth - 1.0f;
@@ -24,9 +38,8 @@ public:
         // Convert from clip space to view space
         glm::vec4 viewSpace = glm::inverse(projection) * clipSpace;
 
-        viewSpace.z = -3.0f; // Convert to correct Z-axis for a directional vector
-        viewSpace.w = 0.0f;  // Zero out W to treat it as a direction
-
+        viewSpace.z = -1.0f;
+        viewSpace.w = 0.0f;
 
         // Convert from view space to world space
         glm::vec3 worldSpace = glm::vec3(glm::inverse(view) * viewSpace);

@@ -25,9 +25,10 @@ public:
 
     glm::mat4 getProjectionMatrix(float windowWidth, float windowHeight) const
     {
-        float aspectRatio = windowWidth / windowHeight;
-        float zoomLevel = 2.0f;
-        return glm::ortho(-zoomLevel * aspectRatio, zoomLevel * aspectRatio, -zoomLevel, zoomLevel, 0.1f, 100.0f);
+        // float aspectRatio = windowWidth / windowHeight;
+        // float zoomLevel = 2.0f;
+        // return glm::ortho(-zoomLevel * aspectRatio, zoomLevel * aspectRatio, -zoomLevel, zoomLevel, 0.1f, 100.0f);
+        return glm::perspective(glm::radians(45.0f), windowWidth / windowHeight, 0.1f, 100.0f);
     }
 
     void initializeMatrices(float windowWidth, float windowHeight, glm::vec3 cameraPosition)
