@@ -2,7 +2,6 @@
 #include "ComponentManager.h"
 #include "EntityManager.h"
 #include "GeometryComponent.h"
-// #include "ThreeDComponent.h" // Include the new ThreeDComponent header
 #include "System.h"
 #include "TransformComponent.h"
 #include <glad.h>
@@ -48,15 +47,7 @@ void CheckGLError()
 class RenderSystem : public System
 {
 public:
-    RenderSystem(EventBus &eventBus, SceneContext &context)
-        : eventBus(eventBus), sceneContext(context)
-    {
-        this->eventBus.subscribe<EntityCreatedEvent>([this](const EntityCreatedEvent &event)
-                                                     { this->AddEntity(event.entity); });
-
-        this->eventBus.subscribe<EntityDestroyedEvent>([this](const EntityDestroyedEvent &event)
-                                                       { this->RemoveEntity(event.entity); });
-    }
+    RenderSystem(EventBus &eventBus, SceneContext &context);
     void Update(float dt, ComponentManager &componentManager);
     void Initialize();
     void RemoveEntity(Entity entity);
@@ -67,8 +58,6 @@ private:
 
     ShaderManager shaderManager;
 
-    unsigned int geometryShaderProgram;
-    // unsigned int threeDShaderProgram;
     unsigned int shaderProgram;
 
     void initializeShaders();
@@ -77,6 +66,16 @@ private:
     void setupGeometry(Entity entity, ComponentManager &componentManager);
     void setupShaderWithEntityData(TransformComponent &transform, float angle);
 };
+
+RenderSystem::RenderSystem(EventBus &eventBus, SceneContext &context)
+    : eventBus(eventBus), sceneContext(context)
+{
+    this->eventBus.subscribe<EntityCreatedEvent>([this](const EntityCreatedEvent &event)
+                                                 { this->AddEntity(event.entity); });
+
+    this->eventBus.subscribe<EntityDestroyedEvent>([this](const EntityDestroyedEvent &event)
+                                                   { this->RemoveEntity(event.entity); });
+}
 
 void RenderSystem::setupGeometry(Entity entity, ComponentManager &componentManager)
 {
@@ -124,19 +123,13 @@ void RenderSystem::Update(float dt, ComponentManager &componentManager)
 {
     auto [lightPos, lightColor] = sceneContext.getLightProperties();
 
-    // Current time in seconds (you might need to adjust this based on how you track time in your application)
-    float currentTime = glfwGetTime(); // GLFW function, assuming GLFW is being used for window management
-    float angle = currentTime;         // Simple rotation angle: rotate one full rotation per second
+    float currentTime = glfwGetTime();
+    float angle = currentTime;
 
     glEnable(GL_DEPTH_TEST);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-    // glUseProgram(shaderProgram); // Use shader program
-    CheckGLError();
-
     glm::mat4 view = sceneContext.viewMatrix;
-
-    // Choose to fit the view vertically, adjust horizontally
     glm::mat4 projection = sceneContext.projectionMatrix;
 
     for (auto entity : this->entities)
@@ -153,7 +146,7 @@ void RenderSystem::Update(float dt, ComponentManager &componentManager)
             CheckGLError();
         }
 
-        glUseProgram(shaderProgram); // Use shader program
+        shaderManager.UseShader(shaderProgram);
 
         int lightPosLoc = glGetUniformLocation(shaderProgram, "lightPos");
         glUniform3fv(lightPosLoc, 1, glm::value_ptr(lightPos));

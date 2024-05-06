@@ -1,141 +1,174 @@
 #pragma once
+
 #include "ComponentManager.h"
 #include "EntityManager.h"
 #include "RenderSystem.h"
-#include <glad.h> // Include GLAD before GLFW.
+#include "SystemManager.h"
+#include "EventBus.h"
+#include "QueueCollection.h"
+#include "MouseSystem.h"
+#include "MessageSystem.h"
 #include <glfw3.h>
 #include <iostream>
-#include <tuple>
-#include "QueueCollection.h"
-#include "MessageSystem.h"
-#include "EventBus.h"
-#include "MouseSystem.h"
+
+#pragma region ClassDeclaration
 
 class OpenGLApp
 {
 public:
-    // event bus
-    EventBus eventBus;
+    OpenGLApp(QueueCollection &queueCollection);
+    void Initialize();
+    void Run();
 
-    // managers
+    static void framebuffer_size_callback(GLFWwindow *window, int width, int height);
+    static void staticMouseButtonCallback(GLFWwindow *window, int button, int action, int mods);
+    static void cursorPositionCallback(GLFWwindow *window, double xpos, double ypos);
+
+private:
+    void initialize();
+    void setupWindow();
+
+    EventBus eventBus;
     EntityManager entityManager;
     ComponentManager componentManager;
+    SystemManager systemManager;
 
-    // systems
-    RenderSystem renderSystem;
-    MessageSystem messageSystem;
+    // RenderSystem renderSystem;
+    // MessageSystem messageSystem;
+    // MouseSystem mouseSystem;
 
     QueueCollection &queueCollection;
-
     SceneContext context;
 
-    OpenGLApp(QueueCollection &queueCollection)
-        : queueCollection(queueCollection),
-          entityManager(eventBus),
-          context(SceneContext(800, 600, glm::vec3(0.0f, 0.0f, 5.0f))),
-          renderSystem(eventBus, context),
-          //   messageSystem(entityManager, componentManager, queueCollection, eventBus)
-          mouseSystem(entityManager, componentManager, context),
-          messageSystem(entityManager, componentManager, queueCollection)
+    GLFWwindow *window;
+};
+
+#pragma endregion
+
+#pragma region Constructor
+
+OpenGLApp::OpenGLApp(QueueCollection &queueCollection)
+    : queueCollection(queueCollection),
+      entityManager(eventBus),
+      context(SceneContext(800, 600, glm::vec3(0.0f, 0.0f, 5.0f))),
+      systemManager()
+    //   , renderSystem(eventBus, context),
+    //   messageSystem(entityManager, componentManager, queueCollection),
+    //   mouseSystem(entityManager, componentManager, context)
+{
+    // Adding systems with the required dependencies passed to the constructors
+    systemManager.AddSystem<RenderSystem>(eventBus, context);
+    systemManager.AddSystem<MessageSystem>(entityManager, componentManager, queueCollection);
+    systemManager.AddSystem<MouseSystem>(entityManager, componentManager, context);
+}
+
+#pragma endregion
+
+#pragma region InitializationMethods
+
+void OpenGLApp::Initialize()
+{
+    glfwInit();
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+#ifdef __APPLE__
+    glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
+#endif
+    glfwWindowHint(GLFW_DEPTH_BITS, 24);
+
+    window = glfwCreateWindow(800, 600, "Render System Usage", NULL, NULL);
+    glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
+
+    if (window == NULL)
     {
+        std::cerr << "Failed to create GLFW window\n";
+        glfwTerminate();
+        exit(-1);
+    }
+    glfwMakeContextCurrent(window);
+    setupWindow();
+    initialize();
+
+    if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
+    {
+        std::cerr << "Failed to initialize GLAD\n";
+        exit(-1);
+    }
+    systemManager.GetSystem<RenderSystem>().Initialize();
+}
+
+void OpenGLApp::Run()
+{
+    glEnable(GL_DEPTH_TEST);
+    glDepthFunc(GL_LESS);
+    glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
+
+    while (!glfwWindowShouldClose(window))
+    {
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+        systemManager.GetSystem<MessageSystem>().Update(0.016f); // Assuming 60 FPS, so dt = 1/60
+        systemManager.GetSystem<RenderSystem>().Update(0.016f, componentManager);
+
+        glfwSwapBuffers(window);
+        glfwPollEvents();
     }
 
-    void initialize()
-    {
-        // Register the static callback function
-        glfwSetMouseButtonCallback(window, OpenGLApp::staticMouseButtonCallback);
-        glfwSetCursorPosCallback(window, OpenGLApp::cursorPositionCallback);
-    }
+    glfwDestroyWindow(window);
+    glfwTerminate();
+}
 
-    static void staticMouseButtonCallback(GLFWwindow *window, int button, int action, int mods)
+#pragma endregion
+
+#pragma region Callbacks
+
+void OpenGLApp::framebuffer_size_callback(GLFWwindow *window, int width, int height)
+{
+    glViewport(0, 0, width, height);
+}
+
+void OpenGLApp::staticMouseButtonCallback(GLFWwindow *window, int button, int action, int mods)
+{
+    OpenGLApp *app = static_cast<OpenGLApp *>(glfwGetWindowUserPointer(window));
+    if (app)
     {
-        OpenGLApp *app = static_cast<OpenGLApp *>(glfwGetWindowUserPointer(window)); // Get the instance
         if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS)
         {
             double xpos, ypos;
-            glfwGetCursorPos(window, &xpos, &ypos);        // Get mouse position
-            app->mouseSystem.handleMouseClick(xpos, ypos); // Access the instance method
+            glfwGetCursorPos(window, &xpos, &ypos);
+            app->systemManager.GetSystem<MouseSystem>().handleMouseClick(xpos, ypos);
         }
 
         if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_RELEASE)
         {
-            app->mouseSystem.handleMouseRelease();
+            app->systemManager.GetSystem<MouseSystem>().handleMouseRelease();
         }
     }
+}
 
-    static void cursorPositionCallback(GLFWwindow *window, double xpos, double ypos)
+void OpenGLApp::cursorPositionCallback(GLFWwindow *window, double xpos, double ypos)
+{
+    OpenGLApp *app = static_cast<OpenGLApp *>(glfwGetWindowUserPointer(window));
+    if (app)
     {
-        OpenGLApp *app = static_cast<OpenGLApp *>(glfwGetWindowUserPointer(window));
-        app->mouseSystem.handleMouseMove(xpos, ypos);
+        app->systemManager.GetSystem<MouseSystem>().handleMouseMove(xpos, ypos);
     }
+}
 
-    void setupWindow()
-    {
-        // Set the window user pointer to 'this' for the static callback to reference
-        glfwSetWindowUserPointer(window, this);
-    }
+#pragma endregion
 
-    static void framebuffer_size_callback(GLFWwindow *window, int width, int height)
-    {
-        glViewport(0, 0, width, height);
-    }
+#pragma region PrivateMethods
 
-    void Initialize()
-    {
-        glfwInit();
-        glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-        glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
-        glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-#ifdef __APPLE__
-        glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE); // For macOS
-#endif
-        glfwWindowHint(GLFW_DEPTH_BITS, 24); // Or 16, 32, etc., depending on desired precision
-        window = glfwCreateWindow(800, 600, "Render System Usage", NULL, NULL);
-        glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
+void OpenGLApp::initialize()
+{
+    glfwSetMouseButtonCallback(window, OpenGLApp::staticMouseButtonCallback);
+    glfwSetCursorPosCallback(window, OpenGLApp::cursorPositionCallback);
+}
 
-        if (window == NULL)
-        {
-            std::cerr << "Failed to create GLFW window" << std::endl;
-            glfwTerminate();
-            exit(-1);
-        }
-        glfwMakeContextCurrent(window);
-        setupWindow();
-        initialize();
+void OpenGLApp::setupWindow()
+{
+    glfwSetWindowUserPointer(window, this);
+}
 
-        // GLAD: load all OpenGL function pointers
-        if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
-        {
-            std::cerr << "Failed to initialize GLAD" << std::endl;
-            exit(-1);
-        }
-        renderSystem.Initialize();
-    }
-
-    void Run()
-    {
-        glEnable(GL_DEPTH_TEST); // Enable depth testing
-        glDepthFunc(GL_LESS);    // Specify that closer objects obscure farther ones
-
-        glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
-
-        // Rendering loop
-        while (!glfwWindowShouldClose(window))
-        {
-            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-            messageSystem.Update(0.016f);
-            renderSystem.Update(0.016f, componentManager);
-
-            glfwSwapBuffers(window);
-            glfwPollEvents();
-        }
-        // Cleanup GLFW
-        glfwDestroyWindow(window);
-        glfwTerminate();
-    }
-
-private:
-    GLFWwindow *window;
-    MouseSystem mouseSystem;
-};
+#pragma endregion

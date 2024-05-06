@@ -15,6 +15,9 @@
 #include <arpa/inet.h>
 #include <chrono>
 #include <json.hpp>
+
+#include "civetweb.h"
+
 using json = nlohmann::json;
 
 struct EntityDefinition
@@ -28,21 +31,21 @@ struct EntityDefinition
 
 void parseCommandV2(const std::string &command, QueueCollection &queues)
 {
-    // std::cout << command << std::endl;
+    using json = nlohmann::json;
 
     json j = json::parse(command);
-
     EntityCreationMessageV2 msg;
+
     try
     {
         msg.id = j.at("id").get<int>();
     }
     catch (const json::type_error &e)
     {
-        // If there's a type error, try to parse as string then convert
         std::string idStr = j.at("id").get<std::string>();
         msg.id = std::stoi(idStr);
     }
+
     msg.shapeType = j.at("shapeType").get<std::string>();
     msg.transform.position = j["transform"]["position"].get<std::vector<float>>();
     msg.transform.rotation = j["transform"]["rotation"].get<std::vector<float>>();
@@ -50,16 +53,28 @@ void parseCommandV2(const std::string &command, QueueCollection &queues)
     msg.shaders.vertexShader = j["shaders"]["vertex"].get<std::string>();
     msg.shaders.fragmentShader = j["shaders"]["fragment"].get<std::string>();
 
-    // Example of extracting uniforms if only using floatUniforms
+    // Extracting uniform data
     for (auto &[key, val] : j["uniforms"].items())
     {
         msg.uniforms.floatUniforms[key] = val.get<std::vector<float>>();
     }
 
+    // Extracting vertex data
+    if (j.find("vertexData") != j.end())
+    {
+        if (j["vertexData"].find("positions") != j["vertexData"].end())
+            msg.vertexData.positions = j["vertexData"]["positions"].get<std::vector<float>>();
+        if (j["vertexData"].find("normals") != j["vertexData"].end())
+            msg.vertexData.normals = j["vertexData"]["normals"].get<std::vector<float>>();
+        if (j["vertexData"].find("texCoords") != j["vertexData"].end())
+            msg.vertexData.texCoords = j["vertexData"]["texCoords"].get<std::vector<float>>();
+        if (j["vertexData"].find("colors") != j["vertexData"].end())
+            msg.vertexData.colors = j["vertexData"]["colors"].get<std::vector<float>>();
+    }
+
+    // Pushing the parsed message into the creation queue
     std::vector<EntityCreationMessageV2> creationMessages{msg};
     queues.entityCreationV2Queue.Push(creationMessages);
-
-    // Create entity logic with msg
 
     // Additional commands like DELETE or COLOR can be similarly handled
 }
@@ -105,6 +120,72 @@ void parseCommand(const std::string &command, QueueCollection &queues)
     }
 }
 
+int handlePostRequest(struct mg_connection *conn, void *cbdata)
+{
+    const struct mg_request_info *req_info = mg_get_request_info(conn);
+    if (req_info->content_length > 0)
+    {
+        std::string post_data(req_info->content_length, '\0');
+        mg_read(conn, &post_data[0], req_info->content_length);
+
+        try
+        {
+            // Assuming QueueCollection is globally accessible or passed as callback data
+            QueueCollection &queues = *static_cast<QueueCollection *>(cbdata);
+            // Parse and process the request data
+            parseCommandV2(post_data, queues);
+
+            // Respond to the request indicating success
+            mg_printf(conn,
+                      "HTTP/1.1 200 OK\r\n"
+                      "Content-Type: application/json\r\n\r\n"
+                      "{\"status\": \"success\"}\n");
+        }
+        catch (const std::exception &e)
+        {
+            // Handle parsing error or processing error
+            mg_printf(conn,
+                      "HTTP/1.1 400 Bad Request\r\n"
+                      "Content-Type: application/json\r\n\r\n"
+                      "{\"error\": \"%s\"}\n",
+                      e.what());
+        }
+    }
+    else
+    {
+        // Handle case with no content provided
+        mg_printf(conn,
+                  "HTTP/1.1 411 Length Required\r\n"
+                  "Content-Type: application/json\r\n\r\n"
+                  "{\"error\": \"No data provided\"}\n");
+    }
+    return 200; // Return an HTTP status code
+}
+
+void ServerThreadV2(QueueCollection &queues)
+{
+    const char *options[] = {
+        "listening_ports", "8080",
+        0};
+
+    mg_callbacks callbacks{};
+    memset(&callbacks, 0, sizeof(callbacks));
+
+    struct mg_context *ctx = mg_start(&callbacks, nullptr, options);
+    if (!ctx)
+    {
+        std::cerr << "Could not start CivetWeb server." << std::endl;
+        return;
+    }
+
+    mg_set_request_handler(ctx, "/entity", handlePostRequest, static_cast<void *>(&queues));
+
+    std::cout << "CivetWeb server started. Press Enter to stop.\n";
+    std::cin.get();
+
+    mg_stop(ctx);
+}
+
 void ServerThread(QueueCollection &queues)
 {
     int server_fd;
@@ -119,7 +200,7 @@ void ServerThread(QueueCollection &queues)
 
     address.sin_family = AF_INET;
     address.sin_addr.s_addr = INADDR_ANY;
-    address.sin_port = htons(8080);
+    address.sin_port = htons(8081);
 
     if (bind(server_fd, (struct sockaddr *)&address, sizeof(address)) < 0)
     {
@@ -167,33 +248,6 @@ std::string createEntityCommand(int id, const std::string &type, float x, float 
 {
     return "CREATE " + std::to_string(id) + " " + type + " " + std::to_string(x) + " " + std::to_string(y) + " " + std::to_string(z) + "\n";
 }
-
-// std::string createMockEntityCreationMessage(int id, const std::string shape)
-// {
-//     json j;
-
-//     j["id"] = id;
-//     // not needed for now
-//     j["shapeType"] = "triangle";
-//     j["transform"] = {
-//         {"position", {0.0, 0.0, 0.0}},
-//         {"rotation", {0.0, 0.0, 0.0, 1.0}},
-//         {"scale", {1.0, 1.0, 1.0}}};
-//     j["shaders"] = {
-//         // {"vertex", "shaders/vertex/mock_vertex_shader.glsl"},
-//         // {"fragment", "shaders/fragment/mock_fragment_shader.glsl"}};
-//         {"vertex", "shaders/vertex/basicTransform.vert"},
-//         {"fragment", "shaders/fragment/uniformColor.frag"}};
-//     j["uniforms"] = {
-//         // not needed, as it is computed
-//         // {"modelMatrix", {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1}},
-//         // {"vertices", {-0.5f, -0.5f, 0.0f, 0.5f, -0.5f, 0.0f, 0.0f, 0.5f, 0.0f}}, // triangle
-//         {"vertices", {-0.5f, -0.5f, 0.0f, 0.5f, -0.5f, 0.0f, 0.5f, 0.5f, 0.0f, -0.5f, -0.5f, 0.0f, 0.5f, 0.5f, 0.0f, -0.5f, 0.5f, 0.0f}}, // square
-//         {"color", {1.0, 0.0, 0.0, 1.0}} // RGBA for red
-//     };
-
-//     return j.dump(); // Serialize to string
-// }
 
 std::string createMockEntityCreationMessage(int id, const std::string &shapeType, std::vector<float> position)
 {
@@ -307,8 +361,7 @@ void ClientThread()
         {2.0f, 2.0f, 0.0f, "pyramid"},
         {2.0f, -2.0f, 0.0f, "square"},
         {1.5f, 1.0f, 0.0f, "triangle"},
-        {-1.5f, 2.0f, 0.0f, "cube"}
-        };
+        {-1.5f, 2.0f, 0.0f, "cube"}};
     // {-0.75f, 0.75f, 0.0f, "triangle"},
     // {0.75f, 0.75f, 0.0f, "square"},
     // {0.75f, -0.75f, 0.0f, "triangle"},
@@ -320,7 +373,7 @@ void ClientThread()
     int sock = 0, valread;
     struct sockaddr_in serv_addr;
     serv_addr.sin_family = AF_INET;
-    serv_addr.sin_port = htons(8080); // Set to match server port
+    serv_addr.sin_port = htons(8081); // Set to match server port
     while (true)
     {
         // Creating socket file descriptor each loop to ensure fresh start
@@ -371,22 +424,14 @@ void ClientThread()
             if (activeEntities.find(entityId) == activeEntities.end())
             {
                 // const auto &def = entityDefinitions[entityId];
-                // creations.push_back(EntityCreationMessage(entityId, def.type, def.x, def.y, def.z));
                 // activeEntities.insert(entityId);
+                // std::string createMessage = createMockEntityCreationMessage(entityId, def.type, {def.x, def.y, def.z});
 
-                // std::string entityCommand = createEntityCommand(entityId, def.type, def.x, def.y, def.z);
-                // send(sock, entityCommand.c_str(), entityCommand.length(), 0);
+                // std::cout << createMessage << " length: " << createMessage.length() << std::endl;
+
+                // send(sock, createMessage.c_str(), createMessage.length(), 0);
                 // waitForAck(sock);
-
-                const auto &def = entityDefinitions[entityId];
-                activeEntities.insert(entityId);
-                std::string createMessage = createMockEntityCreationMessage(entityId, def.type, {def.x, def.y, def.z});
-
-                std::cout << createMessage << " length: " << createMessage.length() << std::endl;
-
-                send(sock, createMessage.c_str(), createMessage.length(), 0);
-                waitForAck(sock);
-                close(sock); // Close the socket after sending message
+                // close(sock); // Close the socket after sending message
             }
         }
         else if (action == 0)
@@ -417,7 +462,7 @@ void ClientThread()
         // send(sock, message.c_str(), message.length(), 0);
         // waitForAck(sock);
 
-        close(sock);                                                  // Close the socket after sending message
+        close(sock);                                                 // Close the socket after sending message
         std::this_thread::sleep_for(std::chrono::milliseconds(200)); // Throttle message sending
     }
 }
@@ -425,11 +470,13 @@ void ClientThread()
 int main()
 {
     QueueCollection queues;
-    std::thread serverThread(ServerThread, std::ref(queues));
+    std::thread server2Thread(ServerThread, std::ref(queues));
+    std::thread serverThread(ServerThreadV2, std::ref(queues));
     std::thread clientThread(ClientThread);
     OpenGLApp openglApp(queues); // Adjust constructor to accept QueueCollection
     openglApp.Initialize();
     openglApp.Run();
+    server2Thread.join();
     serverThread.join();
     // Ensure the server thread has completed before exiting the program
     clientThread.join(); // This line is commented out along with the initiation of the client thread

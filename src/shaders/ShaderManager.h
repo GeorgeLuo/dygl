@@ -16,6 +16,9 @@ public:
     // Load, compile, and link shaders from files
     GLuint LoadShaderProgram(const std::string &vertexPath, const std::string &fragmentPath);
 
+    // Load, compile, and link shaders from files
+    GLuint CompileAndLinkShaders(const std::string &vertexPath, const std::string &fragmentPath);
+
     // Use (activate) the shader program
     void UseShader(GLuint programID);
 
@@ -35,6 +38,7 @@ public:
 private:
     GLuint currentProgramID;                                               // Keep track of the current in-use shader program
     std::unordered_map<GLuint, std::pair<GLuint, GLuint>> compiledShaders; // Stores compiled shaders for cleanup
+    std::unordered_map<std::string, GLuint> shadersById;
 
     // Methods to compile individual shaders
     GLuint CompileShader(const std::string &source, GLenum type);

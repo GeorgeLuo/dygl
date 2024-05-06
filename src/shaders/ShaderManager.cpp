@@ -13,9 +13,10 @@ ShaderManager::~ShaderManager() {
     }
 }
 
-GLuint ShaderManager::LoadShaderProgram(const std::string& vertexPath, const std::string& fragmentPath) {
-    std::string vertexCode = ReadShaderFromFile(vertexPath);
-    std::string fragmentCode = ReadShaderFromFile(fragmentPath);
+// GLuint ShaderManager::CompileAndLinkShaders(const std::string& vertexPath, const std::string& fragmentPath) {
+GLuint ShaderManager::CompileAndLinkShaders(const std::string& vertexCode, const std::string& fragmentCode) {
+    // std::string vertexCode = ReadShaderFromFile(vertexPath);
+    // std::string fragmentCode = ReadShaderFromFile(fragmentPath);
 
     GLuint vertexShader = CompileShader(vertexCode, GL_VERTEX_SHADER);
     GLuint fragmentShader = CompileShader(fragmentCode, GL_FRAGMENT_SHADER);
@@ -42,6 +43,27 @@ GLuint ShaderManager::LoadShaderProgram(const std::string& vertexPath, const std
 
     return programID;
 }
+
+GLuint ShaderManager::LoadShaderProgram(const std::string& vertexPath, const std::string& fragmentPath) {
+    std::string vertexCode = ReadShaderFromFile(vertexPath);
+    std::string fragmentCode = ReadShaderFromFile(fragmentPath);
+    // Generate hash keys for both shaders
+    std::hash<std::string> hasher;
+    std::string vertexHash = std::to_string(hasher(vertexCode));
+    std::string fragmentHash = std::to_string(hasher(fragmentCode));
+    std::string combinedHash = vertexHash + fragmentHash;
+    // Check if we already have a compiled program for this combination
+    auto it = shadersById.find(combinedHash);
+    if(it != shadersById.end()) {
+        // Program already compiled, return existing GLuint
+        return it->second;
+    }
+    // No existing program, compile, link, and store as before
+    GLuint programID = CompileAndLinkShaders(vertexCode, fragmentCode);
+    shadersById[combinedHash] = programID;
+    return programID;
+}
+
 
 void ShaderManager::UseShader(GLuint programID) {
     glUseProgram(programID);

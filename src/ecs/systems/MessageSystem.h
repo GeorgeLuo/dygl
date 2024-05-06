@@ -67,7 +67,8 @@ private:
                                                                             message.transform.rotation[1],
                                                                             message.transform.rotation[2]));
 
-                std::vector<float> vertices = message.uniforms.floatUniforms.at("vertices");
+                // std::vector<float> vertices = message.uniforms.floatUniforms.at("vertices");
+                std::vector<float> vertices = message.vertexData.positions;
                 std::vector<Vertex> shapeVertices;
                 for (size_t i = 0; i < vertices.size(); i += 3)
                 {

@@ -1,5 +1,6 @@
 #include "ComponentManager.h"
 #include "SelectedComponent.h" // Component to mark selected entities
+#include "TagComponent.h"
 #include "Raycaster.h"
 
 class SelectCommand

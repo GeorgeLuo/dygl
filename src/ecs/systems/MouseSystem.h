@@ -3,7 +3,7 @@
 #include "SelectCommand.h"
 #include "EntityManager.h"
 
-class MouseSystem
+class MouseSystem : public System
 {
 
 public:
@@ -14,10 +14,12 @@ public:
     void handleMouseClick(double xpos, double ypos);
     void handleMouseMove(double xpos, double ypos);
     void handleMouseRelease();
-    MouseSystem(EntityManager &entityManager, ComponentManager &componentManager, SceneContext &sceneContext) : entityManager(entityManager), componentManager(componentManager), sceneContext(sceneContext)
-    {
-    }
+    MouseSystem(EntityManager &entityManager, ComponentManager &componentManager, SceneContext &sceneContext);
 };
+
+MouseSystem::MouseSystem(EntityManager &entityManager, ComponentManager &componentManager, SceneContext &sceneContext) : entityManager(entityManager), componentManager(componentManager), sceneContext(sceneContext)
+{
+}
 
 void MouseSystem::handleMouseClick(double xpos, double ypos)
 {
@@ -27,8 +29,8 @@ void MouseSystem::handleMouseClick(double xpos, double ypos)
 
 void MouseSystem::handleMouseRelease()
 {
-    DeselectCommand deselectCommand(componentManager); // Create the command
-    deselectCommand.execute();                         // Execute the command
+    DeselectCommand deselectCommand(componentManager);
+    deselectCommand.execute();
 }
 
 void MouseSystem::handleMouseMove(double xpos, double ypos)
