@@ -10,14 +10,15 @@ public:
     EntityManager &entityManager;
     ComponentManager &componentManager;
     SceneContext &sceneContext;
+    EventBus &eventBus;
 
     void handleMouseClick(double xpos, double ypos);
     void handleMouseMove(double xpos, double ypos);
     void handleMouseRelease();
-    MouseSystem(EntityManager &entityManager, ComponentManager &componentManager, SceneContext &sceneContext);
+    MouseSystem(EventBus &eventBus, EntityManager &entityManager, ComponentManager &componentManager, SceneContext &sceneContext);
 };
 
-MouseSystem::MouseSystem(EntityManager &entityManager, ComponentManager &componentManager, SceneContext &sceneContext) : entityManager(entityManager), componentManager(componentManager), sceneContext(sceneContext)
+MouseSystem::MouseSystem(EventBus &eventBus, EntityManager &entityManager, ComponentManager &componentManager, SceneContext &sceneContext) : eventBus(eventBus), entityManager(entityManager), componentManager(componentManager), sceneContext(sceneContext)
 {
 }
 
@@ -35,6 +36,6 @@ void MouseSystem::handleMouseRelease()
 
 void MouseSystem::handleMouseMove(double xpos, double ypos)
 {
-    MoveCommand moveCommand(componentManager, xpos, ypos, sceneContext.windowWidth, sceneContext.windowHeight, sceneContext.viewMatrix, sceneContext.projectionMatrix, sceneContext.cameraPosition);
+    MoveCommand moveCommand(eventBus, componentManager, xpos, ypos, sceneContext.windowWidth, sceneContext.windowHeight, sceneContext.viewMatrix, sceneContext.projectionMatrix, sceneContext.cameraPosition);
     moveCommand.execute();
 }

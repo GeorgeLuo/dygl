@@ -56,7 +56,13 @@ void parseCommandV2(const std::string &command, QueueCollection &queues)
     // Extracting uniform data
     for (auto &[key, val] : j["uniforms"].items())
     {
-        msg.uniforms.floatUniforms[key] = val.get<std::vector<float>>();
+        std::string type = val["type"];
+        std::vector<float> values = val["value"].get<std::vector<float>>();
+
+        if (type == "floatVecUniforms" && values.size() >= 4)
+        {
+            msg.uniforms.floatVecUniforms[key] = values;
+        }
     }
 
     // Extracting vertex data
@@ -247,59 +253,6 @@ void ServerThread(QueueCollection &queues)
 std::string createEntityCommand(int id, const std::string &type, float x, float y, float z)
 {
     return "CREATE " + std::to_string(id) + " " + type + " " + std::to_string(x) + " " + std::to_string(y) + " " + std::to_string(z) + "\n";
-}
-
-std::string createMockEntityCreationMessage(int id, const std::string &shapeType, std::vector<float> position)
-{
-    json j;
-
-    j["id"] = id;
-    j["shapeType"] = shapeType;
-
-    // Set common transform attributes
-    j["transform"] = {
-        {"position", position},
-        {"rotation", {0.0, 0.0, 0.0, 1.0}},
-        {"scale", {1.0, 1.0, 1.0}}};
-
-    // Set common shaders
-    j["shaders"] = {
-        {"vertex", "shaders/vertex/basicTransform.vert"},
-        {"fragment", "shaders/fragment/uniformColor.frag"}};
-
-    // Set specific uniforms based on shape type
-    if (shapeType == "triangle")
-    {
-        j["uniforms"] = {
-            {"vertices", {-0.5f, -0.5f, 0.0f, 0.5f, -0.5f, 0.0f, 0.0f, 0.5f, 0.0f}}, // Triangle
-            {"color", {1.0, 0.0, 0.0, 1.0}}                                          // RGBA for red
-        };
-    }
-    else if (shapeType == "square")
-    {
-        j["uniforms"] = {
-            {"vertices", {-0.5f, -0.5f, 0.0f, 0.5f, -0.5f, 0.0f, 0.5f, 0.5f, 0.0f, -0.5f, -0.5f, 0.0f, 0.5f, 0.5f, 0.0f, -0.5f, 0.5f, 0.0f}}, // Square
-            {"color", {0.0, 1.0, 0.0, 1.0}}                                                                                                   // RGBA for green
-        };
-    }
-    else if (shapeType == "pyramid")
-    {
-        j["uniforms"] = {
-            {"vertices", {-0.5f, -0.5f, -0.5f, 0.5f, -0.5f, -0.5f, 0.5f, 0.5f, -0.5f, -0.5f, 0.5f, -0.5f, -0.5f, -0.5f, -0.5f, 0.5f, 0.5f, -0.5f, -0.5f, -0.5f, -0.5f, 0.5f, -0.5f, -0.5f, 0.0f, 0.0f, 0.5f, 0.5f, -0.5f, -0.5f, 0.5f, 0.5f, -0.5f, 0.0f, 0.0f, 0.5f, 0.5f, 0.5f, -0.5f, -0.5f, 0.5f, -0.5f, 0.0f, 0.0f, 0.5f, -0.5f, 0.5f, -0.5f, -0.5f, -0.5f, -0.5f, 0.0f, 0.0f, 0.5f}},
-            {"color", {0.0, 1.0, 0.0, 1.0}}};
-    }
-    else if (shapeType == "cube")
-    {
-        j["uniforms"] = {
-            {"vertices", {-0.5, -0.5, 0.5, 0.5, -0.5, 0.5, 0.5, 0.5, 0.5, -0.5, 0.5, 0.5, -0.5, -0.5, 0.5, 0.5, 0.5, 0.5, 0.5, -0.5, 0.5, 0.5, -0.5, -0.5, 0.5, 0.5, -0.5, 0.5, 0.5, -0.5, 0.5, 0.5, 0.5, 0.5, -0.5, 0.5, -0.5, -0.5, -0.5, 0.5, -0.5, -0.5, 0.5, 0.5, -0.5, -0.5, 0.5, -0.5, -0.5, -0.5, -0.5, 0.5, 0.5, -0.5, -0.5, -0.5, -0.5, -0.5, -0.5, 0.5, -0.5, 0.5, 0.5, -0.5, 0.5, -0.5, -0.5, -0.5, -0.5, -0.5, 0.5, 0.5, -0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, -0.5, -0.5, 0.5, -0.5, -0.5, 0.5, 0.5, 0.5, 0.5, -0.5, -0.5, -0.5, -0.5, 0.5, -0.5, -0.5, 0.5, -0.5, 0.5, -0.5, -0.5, 0.5, -0.5, -0.5, -0.5, 0.5, -0.5, 0.5}},
-            {"color", {0.0, 1.0, 0.0, 1.0}}};
-    }
-    else
-    {
-        throw std::runtime_error("Unsupported shape type");
-    }
-
-    return j.dump() + "\n"; // Serialize to string
 }
 
 std::string deleteEntityCommand(int id)

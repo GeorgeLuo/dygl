@@ -43,8 +43,13 @@ public:
         availableEntities.pop();
         ++livingEntityCount;
 
-        eventBus.publish(EntityCreatedEvent(id));
+        // eventBus.publish(EntityCreatedEvent(id));
         return id;
+    }
+
+    void PublishEntityCreation(Entity entity)
+    {
+        eventBus.publish(EntityCreatedEvent(entity));
     }
 
     void DestroyEntity(Entity entity)

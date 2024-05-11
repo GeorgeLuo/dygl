@@ -13,11 +13,7 @@ ShaderManager::~ShaderManager() {
     }
 }
 
-// GLuint ShaderManager::CompileAndLinkShaders(const std::string& vertexPath, const std::string& fragmentPath) {
 GLuint ShaderManager::CompileAndLinkShaders(const std::string& vertexCode, const std::string& fragmentCode) {
-    // std::string vertexCode = ReadShaderFromFile(vertexPath);
-    // std::string fragmentCode = ReadShaderFromFile(fragmentPath);
-
     GLuint vertexShader = CompileShader(vertexCode, GL_VERTEX_SHADER);
     GLuint fragmentShader = CompileShader(fragmentCode, GL_FRAGMENT_SHADER);
 
@@ -79,6 +75,10 @@ void ShaderManager::SetUniform1f(GLuint programID, const std::string& name, floa
 
 void ShaderManager::SetUniform3f(GLuint programID, const std::string& name, float v1, float v2, float v3) {
     glUniform3f(glGetUniformLocation(programID, name.c_str()), v1, v2, v3);
+}
+
+void ShaderManager::SetUniform4fv(GLuint programID, const std::string &name, const glm::vec4 &value) {
+    glUniform4f(glGetUniformLocation(programID, name.c_str()), value[0], value[1], value[2], value[3]);
 }
 
 void ShaderManager::SetUniformMatrix4fv(GLuint programID, const std::string& name, const GLfloat* value) {

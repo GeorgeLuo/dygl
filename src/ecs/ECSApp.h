@@ -10,6 +10,7 @@
 #include "MessageSystem.h"
 #include <glfw3.h>
 #include <iostream>
+#include "RenderPreprocessorSystem.h"
 
 #pragma region ClassDeclaration
 
@@ -33,12 +34,10 @@ private:
     ComponentManager componentManager;
     SystemManager systemManager;
 
-    // RenderSystem renderSystem;
-    // MessageSystem messageSystem;
-    // MouseSystem mouseSystem;
-
     QueueCollection &queueCollection;
+
     SceneContext context;
+    UniformManager uniformManager;
 
     GLFWwindow *window;
 };
@@ -51,15 +50,13 @@ OpenGLApp::OpenGLApp(QueueCollection &queueCollection)
     : queueCollection(queueCollection),
       entityManager(eventBus),
       context(SceneContext(800, 600, glm::vec3(0.0f, 0.0f, 5.0f))),
+      uniformManager(context, componentManager),
       systemManager()
-    //   , renderSystem(eventBus, context),
-    //   messageSystem(entityManager, componentManager, queueCollection),
-    //   mouseSystem(entityManager, componentManager, context)
 {
-    // Adding systems with the required dependencies passed to the constructors
-    systemManager.AddSystem<RenderSystem>(eventBus, context);
+    systemManager.AddSystem<RenderSystem>(eventBus, context, uniformManager);
     systemManager.AddSystem<MessageSystem>(entityManager, componentManager, queueCollection);
-    systemManager.AddSystem<MouseSystem>(entityManager, componentManager, context);
+    systemManager.AddSystem<MouseSystem>(eventBus, entityManager, componentManager, context);
+    systemManager.AddSystem<RenderPreprocessorSystem>(eventBus, componentManager, uniformManager);
 }
 
 #pragma endregion
@@ -108,8 +105,9 @@ void OpenGLApp::Run()
     {
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        systemManager.GetSystem<MessageSystem>().Update(0.016f); // Assuming 60 FPS, so dt = 1/60
-        systemManager.GetSystem<RenderSystem>().Update(0.016f, componentManager);
+        systemManager.GetSystem<MessageSystem>().Update(0.016f);
+        // systemManager.GetSystem<RenderPreprocessorSystem>().Update(0.016f);
+        systemManager.GetSystem<RenderSystem>().UpdateV3(0.016f, componentManager);
 
         glfwSwapBuffers(window);
         glfwPollEvents();

@@ -1,16 +1,15 @@
+#pragma once
 #include <memory>
 #include <typeindex>
 #include <unordered_map>
-#include <utility> // For std::forward
+#include <utility>
 
 class SystemManager
 {
 public:
-    // Template method to add systems with variable constructor arguments
     template <typename T, typename... Args>
     void AddSystem(Args &&...args)
     {
-        // Create a system of type T, forwarding the arguments
         auto system = std::make_unique<T>(std::forward<Args>(args)...);
         auto typeIdx = std::type_index(typeid(T));
         systems[typeIdx] = std::move(system);

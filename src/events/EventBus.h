@@ -8,18 +8,7 @@
 #include <execinfo.h> // For backtrace (POSIX only)
 #include <iostream>
 #include <unistd.h> // For STDERR_FILENO
-
-// Event base class
-struct Event
-{
-    virtual ~Event() = default;
-};
-
-// A specific event type
-struct MyEvent : public Event
-{
-    int data;
-};
+#include "Event.h"
 
 // Event bus class
 class EventBus
@@ -27,7 +16,6 @@ class EventBus
 public:
     EventBus()
     {
-        // Perform any required initialization here
         std::cout << "EventBus created and ready to handle events." << std::endl;
         // For example, pre-reserving space for known events could go here
         // handlers.reserve(10); // Pre-reserve space for performance optimization
@@ -36,19 +24,8 @@ public:
     template <typename EventType>
     void subscribe(std::function<void(const EventType &)> handler)
     {
-        // void *array[10];
-        // size_t size;
-
-        // get void*'s for all entries on the stack
-        // size = backtrace(array, 10);
-
-        // print out all the frames to stderr
-        // fprintf(stderr, "Trace of subscribe call:\n");
-        // backtrace_symbols_fd(array, size, STDERR_FILENO);
-
         handlers[typeid(EventType)].push_back([=](const Event &event)
                                               { handler(static_cast<const EventType &>(event)); });
-        // std::cout << "Subscribed to event type: " << typeid(EventType).name() << std::endl;
     }
 
     template <typename EventType>

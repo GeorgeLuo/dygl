@@ -2,6 +2,7 @@
 #include "SelectedComponent.h" // Component to mark selected entities
 #include "TagComponent.h"
 #include "Raycaster.h"
+#include "EntityUpdatedEvent.h"
 
 class SelectCommand
 {
@@ -62,8 +63,8 @@ private:
 class MoveCommand
 {
 public:
-    MoveCommand(ComponentManager &componentManager, double x, double y, float screenWidth, float screenHeight, glm::mat4 view, glm::mat4 projection, glm::vec3 cameraPosition)
-        : componentManager(componentManager), x(x), y(y), screenWidth(screenWidth), screenHeight(screenHeight), view(view), projection(projection), cameraPosition(cameraPosition) {}
+    MoveCommand(EventBus &eventBus, ComponentManager &componentManager, double x, double y, float screenWidth, float screenHeight, glm::mat4 view, glm::mat4 projection, glm::vec3 cameraPosition)
+        : eventBus(eventBus), componentManager(componentManager), x(x), y(y), screenWidth(screenWidth), screenHeight(screenHeight), view(view), projection(projection), cameraPosition(cameraPosition) {}
     void execute()
     {
         Raycaster raycaster;
@@ -75,8 +76,9 @@ public:
         {
             if (componentManager.HasComponent<TransformComponent>(entity))
             {
-                TransformComponent &transformComponent = componentManager.GetComponent<TransformComponent>(entity); // Note the & to get a reference
+                TransformComponent &transformComponent = componentManager.GetComponent<TransformComponent>(entity);
                 transformComponent.position = targetPosition;
+                eventBus.publish(EntityUpdatedEvent(entity));
             }
         }
     }
@@ -87,4 +89,5 @@ private:
     float screenWidth, screenHeight;
     glm::mat4 view, projection;
     glm::vec3 cameraPosition;
+    EventBus &eventBus;
 };

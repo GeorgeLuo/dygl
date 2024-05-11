@@ -47,6 +47,8 @@ private:
             for (const auto &message : creationMessages)
             {
                 auto it = idToEntityMap.find(message.id);
+
+                // remaking the entity
                 if (it != idToEntityMap.end())
                 {
                     Entity entity = it->second;
@@ -66,8 +68,6 @@ private:
                                                                             message.transform.rotation[0],
                                                                             message.transform.rotation[1],
                                                                             message.transform.rotation[2]));
-
-                // std::vector<float> vertices = message.uniforms.floatUniforms.at("vertices");
                 std::vector<float> vertices = message.vertexData.positions;
                 std::vector<Vertex> shapeVertices;
                 for (size_t i = 0; i < vertices.size(); i += 3)
@@ -78,25 +78,19 @@ private:
                 GeometryComponent shapeGeometry(shapeVertices);
                 componentManager.AddComponent(newEntity, shapeGeometry);
 
-                // TagComponent tagComponent;
-                // tagComponent.AddTag("shape");
-                // componentManager.AddComponent(newEntity, tagComponent);
-
                 ShaderComponent shaderComponent(message.shaders.vertexShader, message.shaders.fragmentShader);
                 componentManager.AddComponent(newEntity, shaderComponent);
 
-                ColorComponent colorComponent(message.uniforms.floatUniforms.at("color")[0],
-                                              message.uniforms.floatUniforms.at("color")[1],
-                                              message.uniforms.floatUniforms.at("color")[2]);
+                ColorComponent colorComponent(message.uniforms.floatVecUniforms.at("color")[0],
+                                              message.uniforms.floatVecUniforms.at("color")[1],
+                                              message.uniforms.floatVecUniforms.at("color")[2]);
 
                 componentManager.AddComponent(newEntity, colorComponent);
 
-                // UniformComponent uniformComponent;
-                // uniformComponent.setModelMatrix(message.uniforms.floatUniforms.at("modelMatrix"));
-                // uniformComponent.setColor(message.uniforms.floatUniforms.at("color"));
-                // componentManager.AddComponent(newEntity, uniformComponent);
-
                 idToEntityMap[message.id] = newEntity;
+
+                // TODO: decide if this makes sense
+                entityManager.PublishEntityCreation(newEntity);
             }
         }
     }
