@@ -53,26 +53,32 @@ void RenderPreprocessorSystem::AddEntity(Entity entity)
 {
     System::AddEntity(entity);
 
-    unsigned int VAO, VBO;
-    glGenVertexArrays(1, &VAO);
-    glBindVertexArray(VAO);
-    glGenBuffers(1, &VBO);
-    glBindBuffer(GL_ARRAY_BUFFER, VBO);
-
-    GLsizei numVertices = 0;
-    if (this->componentManager.HasComponent<GeometryComponent>(entity))
+    // geometry
+    if (!this->componentManager.HasComponent<RenderComponent>(entity))
     {
-        auto &geometry = this->componentManager.GetComponent<GeometryComponent>(entity);
-        numVertices = geometry.vertices.size();
+        unsigned int VAO, VBO;
+        glGenVertexArrays(1, &VAO);
+        glBindVertexArray(VAO);
+        glGenBuffers(1, &VBO);
         glBindBuffer(GL_ARRAY_BUFFER, VBO);
-        glBufferData(GL_ARRAY_BUFFER, numVertices * sizeof(Vertex), geometry.vertices.data(), GL_STATIC_DRAW);
+
+        GLsizei numVertices = 0;
+        if (this->componentManager.HasComponent<GeometryComponent>(entity))
+        {
+            auto &geometry = this->componentManager.GetComponent<GeometryComponent>(entity);
+            numVertices = geometry.vertices.size();
+            glBindBuffer(GL_ARRAY_BUFFER, VBO);
+            glBufferData(GL_ARRAY_BUFFER, numVertices * sizeof(Vertex), geometry.vertices.data(), GL_STATIC_DRAW);
+        }
+        glGenBuffers(1, &VBO);
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void *)0);
+        glEnableVertexAttribArray(0);
+        glBindVertexArray(0);
+        // RenderComponent renderComponent{VAO, VBO};
+        // RenderComponent renderComponent{VAO, VBO, numVertices};
+        auto renderComponent = RenderComponent(VAO, VBO, numVertices);
+        this->componentManager.AddComponent(entity, renderComponent);
     }
-    glGenBuffers(1, &VBO);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void *)0);
-    glEnableVertexAttribArray(0);
-    glBindVertexArray(0);
-    RenderComponent renderComponent{VAO, VBO};
-    this->componentManager.AddComponent(entity, renderComponent);
 
     // once per frame environment setup
     auto [lightPos, lightColor] = this->uniformManager.sceneContext.getLightProperties();
@@ -91,7 +97,11 @@ void RenderPreprocessorSystem::AddEntity(Entity entity)
     glm::mat4 view = this->uniformManager.sceneContext.viewMatrix;
     uniformManager.StoreEntityUniforms(entity, "view", view);
 
-    glm::mat4 projection = this->uniformManager.sceneContext.projectionMatrix;
+    glm::mat4 projection = this->uniformManager.sceneContext.getPerspectiveProjectionMatrix();
+    // if (this->componentManager.HasComponent<TextureComponent>(entity))
+    // {
+    //     projection = this->uniformManager.sceneContext.getOrthographicProjectionMatrix();
+    // }
     uniformManager.StoreEntityUniforms(entity, "projection", projection);
 
     TransformComponent transform;
@@ -103,6 +113,14 @@ void RenderPreprocessorSystem::AddEntity(Entity entity)
     glm::mat4 modelMatrix = transform.GetModelMatrix();
 
     uniformManager.StoreEntityUniforms(entity, "model", modelMatrix);
+
+    if (componentManager.HasComponent<TextureComponent>(entity))
+    {
+        TextureComponent textureComponent = componentManager.GetComponent<TextureComponent>(entity);
+        // Store texture IDs as uniforms; the practical implementation of this will depend on your UniformManager's capabilities
+        // For simplicity, assume we store the first texture ID. Adjust based on your needs.
+        uniformManager.StoreEntityUniforms(entity, "textureID", textureComponent.textureIDs);
+    }
 }
 
 void RenderPreprocessorSystem::Update(float deltaTime)

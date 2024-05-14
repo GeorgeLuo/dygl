@@ -24,8 +24,8 @@ MouseSystem::MouseSystem(EventBus &eventBus, EntityManager &entityManager, Compo
 
 void MouseSystem::handleMouseClick(double xpos, double ypos)
 {
-    SelectCommand selectCommand(componentManager, xpos, ypos, sceneContext.windowWidth, sceneContext.windowHeight, sceneContext.viewMatrix, sceneContext.projectionMatrix, sceneContext.cameraPosition); // Create the command
-    selectCommand.execute();                                                                                                                                                                             // Execute the command
+    SelectCommand selectCommand(componentManager, xpos, ypos, sceneContext.windowWidth, sceneContext.windowHeight, sceneContext.viewMatrix, sceneContext.getPerspectiveProjectionMatrix(), sceneContext.cameraPosition); // Create the command
+    selectCommand.execute();                                                                                                                                                                  // Execute the command
 }
 
 void MouseSystem::handleMouseRelease()
@@ -36,6 +36,6 @@ void MouseSystem::handleMouseRelease()
 
 void MouseSystem::handleMouseMove(double xpos, double ypos)
 {
-    MoveCommand moveCommand(eventBus, componentManager, xpos, ypos, sceneContext.windowWidth, sceneContext.windowHeight, sceneContext.viewMatrix, sceneContext.projectionMatrix, sceneContext.cameraPosition);
+    MoveCommand moveCommand(eventBus, componentManager, xpos, ypos, sceneContext.windowWidth, sceneContext.windowHeight, sceneContext.viewMatrix, sceneContext.getPerspectiveProjectionMatrix(), sceneContext.cameraPosition);
     moveCommand.execute();
 }

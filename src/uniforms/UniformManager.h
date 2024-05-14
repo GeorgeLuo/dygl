@@ -10,6 +10,7 @@ class UniformManager
 {
 public:
     void StoreEntityUniforms(Entity entity, std::string uniformName, std::vector<float> uniform);
+    void StoreEntityUniforms(Entity entity, std::string uniformName, std::vector<int> uniform);
     void StoreEntityUniforms(Entity entity, std::string uniformName, glm::mat4 matrix);
     UniformData GetUniforms(Entity entity);
     UniformManager(SceneContext &sceneContext, ComponentManager &componentManager);
@@ -32,6 +33,11 @@ void UniformManager::StoreEntityUniforms(Entity entity, std::string uniformName,
 void UniformManager::StoreEntityUniforms(Entity entity, std::string uniformName, std::vector<float> uniform)
 {
     entityUniformMap[entity].floatVecUniforms[uniformName] = uniform;
+}
+
+void UniformManager::StoreEntityUniforms(Entity entity, std::string uniformName, std::vector<int> uniform)
+{
+    entityUniformMap[entity].intUniforms[uniformName] = uniform;
 }
 
 UniformData UniformManager::GetUniforms(Entity entity)

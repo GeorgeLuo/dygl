@@ -13,5 +13,5 @@ struct UniformData
     std::unordered_map<std::string, glm::mat4> mat4Uniforms;
 
     // std::unordered_map<std::string, float> floatUniforms;
-    // std::unordered_map<std::string, int> intUniforms;
+    std::unordered_map<std::string, std::vector<int>> intUniforms;
 };
