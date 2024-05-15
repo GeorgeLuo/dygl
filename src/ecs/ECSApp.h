@@ -13,116 +13,6 @@
 #include "RenderPreprocessorSystem.h"
 #include "TextOverlaySystem.h"
 
-// Return char from keycode
-const std::string getChar(int key)
-{
-    switch (key)
-    {
-    case GLFW_KEY_A:
-        return "a";
-    case GLFW_KEY_B:
-        return "b";
-    case GLFW_KEY_C:
-        return "c";
-    case GLFW_KEY_D:
-        return "d";
-    case GLFW_KEY_E:
-        return "e";
-    case GLFW_KEY_F:
-        return "f";
-    case GLFW_KEY_G:
-        return "g";
-    case GLFW_KEY_H:
-        return "h";
-    case GLFW_KEY_I:
-        return "i";
-    case GLFW_KEY_J:
-        return "j";
-    case GLFW_KEY_K:
-        return "k";
-    case GLFW_KEY_L:
-        return "l";
-    case GLFW_KEY_M:
-        return "m";
-    case GLFW_KEY_N:
-        return "n";
-    case GLFW_KEY_O:
-        return "o";
-    case GLFW_KEY_P:
-        return "p";
-    case GLFW_KEY_Q:
-        return "q";
-    case GLFW_KEY_R:
-        return "r";
-    case GLFW_KEY_S:
-        return "s";
-    case GLFW_KEY_T:
-        return "t";
-    case GLFW_KEY_U:
-        return "u";
-    case GLFW_KEY_V:
-        return "v";
-    case GLFW_KEY_W:
-        return "w";
-    case GLFW_KEY_X:
-        return "x";
-    case GLFW_KEY_Y:
-        return "y";
-    case GLFW_KEY_Z:
-        return "z";
-    case GLFW_KEY_0:
-        return "0";
-    case GLFW_KEY_1:
-        return "1";
-    case GLFW_KEY_2:
-        return "2";
-    case GLFW_KEY_3:
-        return "3";
-    case GLFW_KEY_4:
-        return "4";
-    case GLFW_KEY_5:
-        return "5";
-    case GLFW_KEY_6:
-        return "6";
-    case GLFW_KEY_7:
-        return "7";
-    case GLFW_KEY_8:
-        return "8";
-    case GLFW_KEY_9:
-        return "9";
-    case GLFW_KEY_SPACE:
-        return " ";
-    case GLFW_KEY_MINUS:
-        return "-";
-    case GLFW_KEY_EQUAL:
-        return "=";
-    case GLFW_KEY_LEFT_BRACKET:
-        return "[";
-    case GLFW_KEY_RIGHT_BRACKET:
-        return "]";
-    case GLFW_KEY_BACKSLASH:
-        return "\\";
-    case GLFW_KEY_SEMICOLON:
-        return ";";
-    case GLFW_KEY_APOSTROPHE:
-        return "'";
-    case GLFW_KEY_GRAVE_ACCENT:
-        return "`";
-    case GLFW_KEY_COMMA:
-        return ",";
-    case GLFW_KEY_PERIOD:
-        return ".";
-    case GLFW_KEY_SLASH:
-        return "/";
-    case GLFW_KEY_TAB:
-        return "\t";
-    case GLFW_KEY_ENTER:
-        return "\n";
-    default:
-        return "";
-    }
-}
-
 #pragma region ClassDeclaration
 
 class OpenGLApp
@@ -207,6 +97,9 @@ void OpenGLApp::Initialize()
     }
     systemManager.GetSystem<RenderSystem>().Initialize();
     systemManager.GetSystem<TextOverlaySystem>().Initialize();
+    // systemManager.GetSystem<TextOverlaySystem>().AddListener(eventBus);
+    systemManager.GetSystem<TextOverlaySystem>().AddTextBlock("system_logs", 0.0f, 0.0f, 0.0f);
+    systemManager.GetSystem<TextOverlaySystem>().AddTextBlock("free_type", 0.0f, 0.0f, 0.0f);
 }
 
 void OpenGLApp::Run()
@@ -223,6 +116,7 @@ void OpenGLApp::Run()
 
         systemManager.GetSystem<MessageSystem>().Update(0.016f);
         // systemManager.GetSystem<RenderSystem>().UpdateV3(0.016f, componentManager);
+        systemManager.GetSystem<RenderPreprocessorSystem>().Update(0.016f);
         systemManager.GetSystem<RenderSystem>().UpdateV4(0.016f, componentManager);
         glfwSwapBuffers(window);
         glfwPollEvents();
@@ -282,7 +176,8 @@ void OpenGLApp::keypressCallback(GLFWwindow *window, int key, int scancode, int 
                 glfwSetWindowShouldClose(window, GL_TRUE);
                 break;
             default:
-                app->systemManager.GetSystem<TextOverlaySystem>().InsertText(0.0f, 0.0f, 0.0f, getChar(key));
+                app->systemManager.GetSystem<TextOverlaySystem>().InputChar(key);
+                // app->systemManager.GetSystem<TextOverlaySystem>().InsertText("helloworld");
                 break;
             }
         }

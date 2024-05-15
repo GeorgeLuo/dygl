@@ -16,7 +16,6 @@
 #include "SceneContext.h"
 #include "UniformData.h"
 #include "UniformManager.h"
-#include "TextComponent.h"
 #include "TextureComponent.h"
 
 void CheckGLError()
@@ -111,7 +110,7 @@ void RenderSystem::setupGeometry(Entity entity, ComponentManager &componentManag
         glBindVertexArray(0); // Unbind VAO to prevent further modifications.
         // Store the VAO and VBO in RenderComponent
         // RenderComponent renderComponent{VAO, VBO};
-        RenderComponent renderComponent{VAO, VBO, numVertices};
+        RenderComponent renderComponent{VAO, VBO, numVertices, 0};
         componentManager.AddComponent(entity, renderComponent);
         // Keep track that we've added the component to avoid duplication in future updates
     }
@@ -196,62 +195,6 @@ void RenderSystem::UpdateV4(float dt, ComponentManager &componentManager)
     }
 }
 
-// void RenderSystem::UpdateV4(float dt, ComponentManager &componentManager)
-// {
-//     for (auto entity : this->entities)
-//     {
-//         if (!componentManager.HasComponent<ShaderComponent>(entity) ||
-//             !componentManager.HasComponent<RenderComponent>(entity))
-//             continue;
-
-//         ShaderComponent shaderComp = componentManager.GetComponent<ShaderComponent>(entity);
-//         unsigned int program = shaderManager.LoadShaderProgram(shaderComp.vertexShader, shaderComp.fragmentShader);
-//         shaderManager.UseShader(program);
-//         CheckGLError();
-
-//         // Get the RenderComponent and bind the VAO
-//         RenderComponent renderComp = componentManager.GetComponent<RenderComponent>(entity);
-//         glBindVertexArray(renderComp.VAO);
-
-//         // Set textures if available
-//         if (componentManager.HasComponent<TextureComponent>(entity))
-//         {
-//             TextureComponent &textureComp = componentManager.GetComponent<TextureComponent>(entity);
-//             // The texture unit index should be decided based on uniform naming conventions or allocations
-//             for (int i = 0; i < textureComp.textureIDs.size(); ++i)
-//             {
-//                 glActiveTexture(GL_TEXTURE0 + i); // Activate the texture unit before binding
-//                 glBindTexture(GL_TEXTURE_2D, textureComp.textureIDs[i]);
-//                 // Assuming shader uniforms are named like texture0, texture1, etc.
-//                 shaderManager.SetUniform1i(program, "texture" + std::to_string(i), i);
-//             }
-//         }
-
-//         // Dynamically set uniforms
-//         UniformData uniforms = uniformManager.GetUniforms(entity);
-//         for (auto &[key, val] : uniforms.floatVecUniforms)
-//         {
-//             if (val.size() == 3)
-//             {
-//                 shaderManager.SetUniform3f(program, key, val[0], val[1], val[2]);
-//             }
-//             else if (val.size() == 4)
-//             {
-//                 shaderManager.SetUniform4fv(program, key, glm::vec4(val[0], val[1], val[2], val[3]));
-//             }
-//         }
-
-//         for (auto &[key, val] : uniforms.mat4Uniforms)
-//         {
-//             shaderManager.SetUniformMatrix4fv(program, key, glm::value_ptr(val));
-//         }
-
-//         // Draw call
-//         glDrawArrays(GL_TRIANGLES, 0, renderComp.vertexCount);
-//         CheckGLError();
-//     }
-// }
-
 void RenderSystem::UpdateV3(float dt, ComponentManager &componentManager)
 {
     for (auto entity : this->entities)
@@ -291,92 +234,6 @@ void RenderSystem::UpdateV3(float dt, ComponentManager &componentManager)
         }
 
         // bind VAO from RenderComponent
-
-        auto &renderComponent = componentManager.GetComponent<RenderComponent>(entity);
-        glBindVertexArray(renderComponent.VAO);
-
-        GLsizei numVertices = 0;
-        if (componentManager.HasComponent<GeometryComponent>(entity))
-        {
-            auto &geometry = componentManager.GetComponent<GeometryComponent>(entity);
-            numVertices = geometry.vertices.size();
-        }
-        glDrawArrays(GL_TRIANGLES, 0, numVertices);
-        CheckGLError();
-    }
-}
-
-void RenderSystem::UpdateV2(float dt, ComponentManager &componentManager)
-{
-    // once per frame environment setup
-    auto [lightPos, lightColor] = this->sceneContext.getLightProperties();
-    glm::mat4 view = this->sceneContext.viewMatrix;
-    glm::mat4 projection = this->sceneContext.getPerspectiveProjectionMatrix();
-
-    for (auto entity : this->entities)
-    {
-        unsigned int program;
-
-        if (!componentManager.HasComponent<GeometryComponent>(entity))
-            continue;
-
-        // load shader
-        if (componentManager.HasComponent<ShaderComponent>(entity))
-        {
-            ShaderComponent component = componentManager.GetComponent<ShaderComponent>(entity);
-            program = shaderManager.LoadShaderProgram(
-                component.vertexShader,
-                component.fragmentShader);
-            CheckGLError();
-
-            shaderManager.UseShader(program);
-        }
-
-        // setup environment - lighting
-        // int lightPosLoc = glGetUniformLocation(program, "lightPos");
-        // glUniform3fv(lightPosLoc, 1, glm::value_ptr(lightPos));
-
-        shaderManager.SetUniform3f(program, "lightPos", lightPos[0], lightPos[1], lightPos[2]);
-
-        // int lightColorLoc = glGetUniformLocation(program, "lightColor");
-        // glUniform3fv(lightColorLoc, 1, glm::value_ptr(lightColor));
-        shaderManager.SetUniform3f(program, "lightColor", lightColor[0], lightColor[1], lightColor[2]);
-
-        // handle entity color
-        if (componentManager.HasComponent<ColorComponent>(entity))
-        {
-            auto &colorComponent = componentManager.GetComponent<ColorComponent>(entity);
-            glm::vec4 color = glm::vec4(colorComponent.r, colorComponent.g, colorComponent.b, 1.0f);
-            // int colorLoc = glGetUniformLocation(program, "ourColor");
-            // glUniform4fv(colorLoc, 1, glm::value_ptr(color));
-            shaderManager.SetUniform4fv(program, "ourColor", color);
-        }
-
-        // setup environment - viewing space
-        // int viewLoc = glGetUniformLocation(program, "view");
-        // int projectionLoc = glGetUniformLocation(program, "projection");
-        // glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
-        // glUniformMatrix4fv(projectionLoc, 1, GL_FALSE, glm::value_ptr(projection));
-
-        shaderManager.SetUniformMatrix4fv(program, "view", glm::value_ptr(view));
-        shaderManager.SetUniformMatrix4fv(program, "projection", glm::value_ptr(projection));
-
-        // handle entity transform
-        TransformComponent transform;
-        if (componentManager.HasComponent<TransformComponent>(entity))
-        {
-            transform = componentManager.GetComponent<TransformComponent>(entity);
-        }
-
-        glm::mat4 modelMatrix = transform.GetModelMatrix();
-        // int modelLoc = glGetUniformLocation(program, "model");
-        // glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(modelMatrix));
-
-        shaderManager.SetUniformMatrix4fv(program, "model", glm::value_ptr(modelMatrix));
-
-        // render
-        if (!componentManager.HasComponent<RenderComponent>(entity))
-            continue;
 
         auto &renderComponent = componentManager.GetComponent<RenderComponent>(entity);
         glBindVertexArray(renderComponent.VAO);

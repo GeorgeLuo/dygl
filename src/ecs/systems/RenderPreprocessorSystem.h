@@ -25,12 +25,6 @@ private:
     UniformManager &uniformManager;
     EventBus &eventBus;
     ComponentManager &componentManager;
-
-    void PerformVisibilityCulling();
-    void SortEntitiesForEfficientRendering();
-    void PrepareLevelOfDetail();
-    void SetupShaders();
-    void PrepareBatches();
 };
 
 RenderPreprocessorSystem::RenderPreprocessorSystem(EventBus &eventBus, ComponentManager &componentManager, UniformManager &uniformManager)
@@ -53,7 +47,6 @@ void RenderPreprocessorSystem::AddEntity(Entity entity)
 {
     System::AddEntity(entity);
 
-    // geometry
     if (!this->componentManager.HasComponent<RenderComponent>(entity))
     {
         unsigned int VAO, VBO;
@@ -63,30 +56,30 @@ void RenderPreprocessorSystem::AddEntity(Entity entity)
         glBindBuffer(GL_ARRAY_BUFFER, VBO);
 
         GLsizei numVertices = 0;
+        GLsizeiptr bufferSize = 0;
+
         if (this->componentManager.HasComponent<GeometryComponent>(entity))
         {
             auto &geometry = this->componentManager.GetComponent<GeometryComponent>(entity);
             numVertices = geometry.vertices.size();
-            glBindBuffer(GL_ARRAY_BUFFER, VBO);
-            glBufferData(GL_ARRAY_BUFFER, numVertices * sizeof(Vertex), geometry.vertices.data(), GL_STATIC_DRAW);
+            bufferSize = numVertices * sizeof(Vertex);
+            glBufferData(GL_ARRAY_BUFFER, bufferSize, geometry.vertices.data(), GL_STATIC_DRAW);
         }
-        glGenBuffers(1, &VBO);
-        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void *)0);
+
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void *)offsetof(Vertex, x)); // Position
         glEnableVertexAttribArray(0);
-        glBindVertexArray(0);
-        // RenderComponent renderComponent{VAO, VBO};
-        // RenderComponent renderComponent{VAO, VBO, numVertices};
-        auto renderComponent = RenderComponent(VAO, VBO, numVertices);
+
+        glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void *)offsetof(Vertex, u)); // Texture coordinates
+        glEnableVertexAttribArray(1);
+
+        auto renderComponent = RenderComponent(VAO, VBO, numVertices, bufferSize);
         this->componentManager.AddComponent(entity, renderComponent);
     }
 
-    // once per frame environment setup
     auto [lightPos, lightColor] = this->uniformManager.sceneContext.getLightProperties();
-
     uniformManager.StoreEntityUniforms(entity, "lightPos", std::vector<float>{lightPos[0], lightPos[1], lightPos[2]});
     uniformManager.StoreEntityUniforms(entity, "lightColor", std::vector<float>{lightColor[0], lightColor[1], lightColor[2]});
 
-    // handle entity color
     if (componentManager.HasComponent<ColorComponent>(entity))
     {
         auto &colorComponent = componentManager.GetComponent<ColorComponent>(entity);
@@ -98,33 +91,54 @@ void RenderPreprocessorSystem::AddEntity(Entity entity)
     uniformManager.StoreEntityUniforms(entity, "view", view);
 
     glm::mat4 projection = this->uniformManager.sceneContext.getPerspectiveProjectionMatrix();
-    // if (this->componentManager.HasComponent<TextureComponent>(entity))
-    // {
-    //     projection = this->uniformManager.sceneContext.getOrthographicProjectionMatrix();
-    // }
     uniformManager.StoreEntityUniforms(entity, "projection", projection);
 
-    TransformComponent transform;
     if (componentManager.HasComponent<TransformComponent>(entity))
     {
-        transform = componentManager.GetComponent<TransformComponent>(entity);
+        TransformComponent &transform = componentManager.GetComponent<TransformComponent>(entity);
+        glm::mat4 modelMatrix = transform.GetModelMatrix();
+        uniformManager.StoreEntityUniforms(entity, "model", modelMatrix);
     }
-
-    glm::mat4 modelMatrix = transform.GetModelMatrix();
-
-    uniformManager.StoreEntityUniforms(entity, "model", modelMatrix);
 
     if (componentManager.HasComponent<TextureComponent>(entity))
     {
         TextureComponent textureComponent = componentManager.GetComponent<TextureComponent>(entity);
-        // Store texture IDs as uniforms; the practical implementation of this will depend on your UniformManager's capabilities
-        // For simplicity, assume we store the first texture ID. Adjust based on your needs.
         uniformManager.StoreEntityUniforms(entity, "textureID", textureComponent.textureIDs);
     }
 }
 
 void RenderPreprocessorSystem::Update(float deltaTime)
 {
+    // Iterate through entities and update OpenGL buffers if necessary
+    for (auto entity : this->entities)
+    {
+        if (componentManager.HasComponent<GeometryComponent>(entity) && componentManager.HasComponent<RenderComponent>(entity))
+        {
+            auto &geometry = componentManager.GetComponent<GeometryComponent>(entity);
+            auto &render = componentManager.GetComponent<RenderComponent>(entity);
+
+            if (geometry.dirty)
+            {
+                glBindVertexArray(render.VAO);
+                glBindBuffer(GL_ARRAY_BUFFER, render.VBO);
+
+                if (geometry.vertices.size() * sizeof(Vertex) > render.bufferSize)
+                {
+                    glBufferData(GL_ARRAY_BUFFER, geometry.vertices.size() * sizeof(Vertex), geometry.vertices.data(), GL_STATIC_DRAW);
+                    render.bufferSize = geometry.vertices.size() * sizeof(Vertex);
+                }
+                else
+                {
+                    glBufferSubData(GL_ARRAY_BUFFER, 0, geometry.vertices.size() * sizeof(Vertex), geometry.vertices.data());
+                }
+
+                render.vertexCount = geometry.vertices.size();
+                geometry.dirty = false;
+
+                glBindVertexArray(0);
+            }
+        }
+    }
 }
 
 void RenderPreprocessorSystem::UpdateEntity(Entity entity)
