@@ -5,6 +5,7 @@
 #include <queue>
 #include <cassert>
 #include "EventBus.h"
+#include <mutex>
 
 struct EntityCreatedEvent : Event
 {
@@ -26,6 +27,7 @@ private:
     std::queue<Entity> availableEntities{};
     uint32_t livingEntityCount{};
     EventBus &eventBus;
+    std::mutex mutex;
 
 public:
     EntityManager(EventBus &eventBus) : livingEntityCount(0), eventBus(eventBus)
@@ -38,12 +40,12 @@ public:
 
     Entity CreateEntity()
     {
+        std::lock_guard<std::mutex> lock(mutex);
         assert(!availableEntities.empty() && "Too many entities.");
         Entity id = availableEntities.front();
         availableEntities.pop();
         ++livingEntityCount;
 
-        // eventBus.publish(EntityCreatedEvent(id));
         return id;
     }
 
@@ -54,6 +56,7 @@ public:
 
     void DestroyEntity(Entity entity)
     {
+        std::lock_guard<std::mutex> lock(mutex);
         assert(entity < MAX_ENTITIES && "Entity out of range.");
         availableEntities.push(entity);
         --livingEntityCount;

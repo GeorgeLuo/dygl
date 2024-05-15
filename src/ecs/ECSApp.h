@@ -12,6 +12,8 @@
 #include <iostream>
 #include "RenderPreprocessorSystem.h"
 #include "TextOverlaySystem.h"
+#include <sstream>
+#include <iomanip>
 
 #pragma region ClassDeclaration
 
@@ -98,8 +100,9 @@ void OpenGLApp::Initialize()
     systemManager.GetSystem<RenderSystem>().Initialize();
     systemManager.GetSystem<TextOverlaySystem>().Initialize();
     // systemManager.GetSystem<TextOverlaySystem>().AddListener(eventBus);
-    systemManager.GetSystem<TextOverlaySystem>().AddTextBlock("system_logs", 0.0f, 0.0f, 0.0f);
+    systemManager.GetSystem<TextOverlaySystem>().AddTextBlock("system_logs", 1.0f, -1.9f, 0.0f);
     systemManager.GetSystem<TextOverlaySystem>().AddTextBlock("free_type", 0.0f, 0.0f, 0.0f);
+    systemManager.GetSystem<TextOverlaySystem>().AddListener(eventBus);
 }
 
 void OpenGLApp::Run()
@@ -145,6 +148,12 @@ void OpenGLApp::staticMouseButtonCallback(GLFWwindow *window, int button, int ac
             double xpos, ypos;
             glfwGetCursorPos(window, &xpos, &ypos);
             app->systemManager.GetSystem<MouseSystem>().handleMouseClick(xpos, ypos);
+
+            std::ostringstream oss;
+            oss << std::fixed << std::setprecision(2) << "clicked (" << xpos << ", " << ypos << ")";
+            std::string formattedString = oss.str();
+
+            app->eventBus.publish(DisplayTextEvent(formattedString, "input_logger", 1.0f, -1.9f, 0.0f));
         }
 
         if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_RELEASE)
@@ -177,7 +186,11 @@ void OpenGLApp::keypressCallback(GLFWwindow *window, int key, int scancode, int 
                 break;
             default:
                 app->systemManager.GetSystem<TextOverlaySystem>().InputChar(key);
-                // app->systemManager.GetSystem<TextOverlaySystem>().InsertText("helloworld");
+                std::ostringstream oss;
+                oss << std::fixed << std::setprecision(2) << "pressed (" << getChar(key) << ")";
+                std::string formattedString = oss.str();
+
+                app->eventBus.publish(DisplayTextEvent(formattedString, "input_logger", 1.0f, -1.9f, 0.0f));
                 break;
             }
         }

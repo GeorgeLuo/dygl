@@ -151,8 +151,8 @@ void initFontSystem(const char *fontPath)
     // Set texture parameters for filtering and wrapping
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     // Clean up
     delete[] ttf_buffer;
     delete[] temp_bitmap;
@@ -175,9 +175,12 @@ public:
     void Update(float deltaTime) override;
 
     void ClearBlock(const std::string blockname);
+    void ClearBlock(Entity entity);
 
     void AppendText(const std::string blockname, const std::string &text);
-    void AddTextBlock(const std::string blockname, float x, float y, float z);
+    Entity AddTextBlock(const std::string blockname, float x, float y, float z, float scaleX = 0.002f, float scaleY = 0.002f);
+    Entity GetEntityByBlockname(const std::string blockname);
+    void ReplaceText(const std::string blockname, const std::string text, float x, float y, float z);
     void PublishBlock(Entity entity);
 
     void InputChar(int character);
@@ -203,7 +206,7 @@ void TextOverlaySystem::Update(float deltaTime)
     }
 }
 
-void TextOverlaySystem::AddTextBlock(const std::string blockname, float x, float y, float z)
+Entity TextOverlaySystem::AddTextBlock(const std::string blockname, float x, float y, float z, float scaleX, float scaleY)
 {
     Entity textEntity = entityManager.CreateEntity();
     System::AddEntity(textEntity);
@@ -214,17 +217,49 @@ void TextOverlaySystem::AddTextBlock(const std::string blockname, float x, float
 
     componentManager.AddComponent(textEntity, ShaderComponent("shaders/vertex/textOverlay.vert", "shaders/fragment/textOverlay.frag"));
     componentManager.AddComponent(textEntity, GeometryComponent(std::vector<Vertex>()));
-    componentManager.AddComponent(textEntity, TransformComponent(x, y, z, 0.005f, 0.005f, 0.005f));
+    componentManager.AddComponent(textEntity, TransformComponent(x, y, z, scaleX, scaleY));
     componentManager.AddComponent(textEntity, TextureComponent(textureAtlasID));
 
     entityManager.PublishEntityCreation(textEntity);
+    return textEntity;
 }
 
 void TextOverlaySystem::AddListener(EventBus &bus)
 {
+    bus.subscribe<DisplayTextEvent>([this](const DisplayTextEvent &event)
+                                    { ReplaceText(event.blockname, event.text, event.x, event.y, event.z); });
+}
+
+void TextOverlaySystem::ReplaceText(const std::string blockname, const std::string text, float x, float y, float z)
+{
+    Entity entity = GetEntityByBlockname(blockname);
+    if (entity == INVALID_ENTITY)
+    {
+        entity = AddTextBlock(blockname, x, y, z);
+    }
+    else
+    {
+        ClearBlock(blockname);
+    }
+    TextBlockComponent &component = componentManager.GetComponent<TextBlockComponent>(entity);
+    component.textblock = text;
+    PublishBlock(entity);
 }
 
 void TextOverlaySystem::ClearBlock(const std::string blockname)
+{
+    Entity entity = GetEntityByBlockname(blockname);
+    ClearBlock(entity);
+}
+
+void TextOverlaySystem::ClearBlock(Entity entity)
+{
+    TextBlockComponent &component = componentManager.GetComponent<TextBlockComponent>(entity);
+    component.textblock.clear();
+}
+
+// TODO: use a map here
+Entity TextOverlaySystem::GetEntityByBlockname(const std::string blockname)
 {
     // find the block by blockname
     for (auto entity : this->entities)
@@ -232,9 +267,10 @@ void TextOverlaySystem::ClearBlock(const std::string blockname)
         TextBlockComponent &component = componentManager.GetComponent<TextBlockComponent>(entity);
         if (component.blockname == blockname)
         {
-            component.textblock.clear();
+            return entity;
         }
     }
+    return INVALID_ENTITY;
 }
 
 void TextOverlaySystem::InputChar(int character)

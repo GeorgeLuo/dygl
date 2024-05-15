@@ -126,7 +126,7 @@ void RenderSystem::Initialize()
     initializeShaders();
     CheckGLError();
 
-    glBindVertexArray(0); // Unbind the VAO to prevent unintended modifications.
+    glBindVertexArray(0);
 }
 
 void RenderSystem::UpdateV4(float dt, ComponentManager &componentManager)
@@ -148,27 +148,28 @@ void RenderSystem::UpdateV4(float dt, ComponentManager &componentManager)
 
         glBindVertexArray(renderComp.VAO);
 
-        // Bind texture if available
+        // Bind textures if available
         if (componentManager.HasComponent<TextureComponent>(entity))
         {
             glEnable(GL_BLEND);
             glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
             TextureComponent &textureComp = componentManager.GetComponent<TextureComponent>(entity);
-            // glBindTexture(GL_TEXTURE_2D, textureComp.textureID);
 
-            // Bind the texture
-            glActiveTexture(GL_TEXTURE0);
-            glBindTexture(GL_TEXTURE_2D, textureComp.textureIDs[0]);
-            glUniform1i(glGetUniformLocation(program, "textTexture"), 0); // Texture unit 0
+            // Bind multiple textures
+            for (unsigned int i = 0; i < textureComp.textureIDs.size(); ++i)
+            {
+                glActiveTexture(GL_TEXTURE0 + i);
+                glBindTexture(GL_TEXTURE_2D, textureComp.textureIDs[i]);
 
-            // Set the text color, example: white
-            glUniform4f(glGetUniformLocation(program, "textColor"), 1.0f, 1.0f, 1.0f, 1.0f);
+                // Set the sampler uniform to the corresponding texture unit
+                std::string uniformName = "textTexture" + std::to_string(i);
+                glUniform1i(glGetUniformLocation(program, uniformName.c_str()), i);
+            }
         }
 
         // Set uniforms
         UniformData uniforms = uniformManager.GetUniforms(entity);
-        // Uniform handling remains unchanged
         for (auto &[key, val] : uniforms.floatVecUniforms)
         {
             if (val.size() == 3)
@@ -186,9 +187,13 @@ void RenderSystem::UpdateV4(float dt, ComponentManager &componentManager)
             shaderManager.SetUniformMatrix4fv(program, key, glm::value_ptr(val));
         }
 
-        GLsizei numVertices = componentManager.HasComponent<GeometryComponent>(entity)
-                                  ? componentManager.GetComponent<GeometryComponent>(entity).vertices.size()
-                                  : 0;
+        for (auto &[key, val] : uniforms.intUniforms)
+        {
+            if (val.size() == 1)
+            {
+                shaderManager.SetUniform1i(program, key, val[0]);
+            }
+        }
 
         glDrawArrays(GL_TRIANGLES, 0, renderComp.vertexCount);
         CheckGLError();

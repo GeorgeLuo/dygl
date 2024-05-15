@@ -5,21 +5,17 @@
 #include "ComponentManager.h"
 #include "SceneMetaChangeEvent.h"
 #include "EntityUpdatedEvent.h"
+#include "TextBlockComponent.h"
 
 class RenderPreprocessorSystem : public System
 {
 public:
-    RenderPreprocessorSystem(ComponentManager &componentManager);
     RenderPreprocessorSystem(EventBus &eventBus, ComponentManager &componentManager, UniformManager &uniformManager);
 
     // virtual ~RenderPreprocessorSystem() override;
     void AddEntity(Entity entity);
     void UpdateEntity(Entity entity);
     void Update(float deltaTime) override;
-
-    void Initialize();
-    // void Update(float dt);
-    void PrepareForRendering();
 
 private:
     UniformManager &uniformManager;
@@ -76,7 +72,7 @@ void RenderPreprocessorSystem::AddEntity(Entity entity)
         this->componentManager.AddComponent(entity, renderComponent);
     }
 
-    auto [lightPos, lightColor] = this->uniformManager.sceneContext.getLightProperties();
+    auto [lightPos, lightColor] = this->uniformManager.GetSceneContext().getLightProperties();
     uniformManager.StoreEntityUniforms(entity, "lightPos", std::vector<float>{lightPos[0], lightPos[1], lightPos[2]});
     uniformManager.StoreEntityUniforms(entity, "lightColor", std::vector<float>{lightColor[0], lightColor[1], lightColor[2]});
 
@@ -87,10 +83,10 @@ void RenderPreprocessorSystem::AddEntity(Entity entity)
         uniformManager.StoreEntityUniforms(entity, "ourColor", color);
     }
 
-    glm::mat4 view = this->uniformManager.sceneContext.viewMatrix;
+    glm::mat4 view = this->uniformManager.GetSceneContext().viewMatrix;
     uniformManager.StoreEntityUniforms(entity, "view", view);
 
-    glm::mat4 projection = this->uniformManager.sceneContext.getPerspectiveProjectionMatrix();
+    glm::mat4 projection = this->uniformManager.GetSceneContext().getPerspectiveProjectionMatrix();
     uniformManager.StoreEntityUniforms(entity, "projection", projection);
 
     if (componentManager.HasComponent<TransformComponent>(entity))
@@ -105,11 +101,18 @@ void RenderPreprocessorSystem::AddEntity(Entity entity)
         TextureComponent textureComponent = componentManager.GetComponent<TextureComponent>(entity);
         uniformManager.StoreEntityUniforms(entity, "textureID", textureComponent.textureIDs);
     }
+
+    // TODO: getting too detailed here. Maybe change to a plugin system
+    if (componentManager.HasComponent<TextBlockComponent>(entity))
+    {
+        auto text = componentManager.GetComponent<TextBlockComponent>(entity);
+        uniformManager.StoreEntityUniforms(entity, "textTexture", text.texture);
+        uniformManager.StoreEntityUniforms(entity, "textColor", text.color);
+    }
 }
 
 void RenderPreprocessorSystem::Update(float deltaTime)
 {
-    // Iterate through entities and update OpenGL buffers if necessary
     for (auto entity : this->entities)
     {
         if (componentManager.HasComponent<GeometryComponent>(entity) && componentManager.HasComponent<RenderComponent>(entity))

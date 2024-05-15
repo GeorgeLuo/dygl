@@ -6,6 +6,7 @@
 #include <array>
 #include <cassert>
 #include <unordered_set>
+#include <mutex>
 
 class IComponentArray
 {
@@ -85,6 +86,8 @@ private:
     // Map from component type to its corresponding ComponentArray
     std::unordered_map<std::type_index, std::shared_ptr<IComponentArray>> componentArrays;
     std::unordered_map<std::type_index, std::unordered_set<Entity>> entitiesByComponentType;
+    std::unordered_set<Entity> validEntities;
+    std::mutex mutex;
 
     // Method to retrieve the ComponentArray for a specific component type
     template <typename T>
@@ -105,13 +108,16 @@ public:
     template <typename T>
     void AddComponent(Entity entity, T component)
     {
+        std::lock_guard<std::mutex> lock(mutex);
         GetComponentArray<T>()->AddComponent(entity, component);
         entitiesByComponentType[std::type_index(typeid(T))].insert(entity);
+        validEntities.insert(entity);
     }
 
     template <typename T>
     bool HasComponent(Entity entity)
     {
+        std::lock_guard<std::mutex> lock(mutex);
         auto componentArray = GetComponentArray<T>();
         if (componentArray)
         {
@@ -123,6 +129,7 @@ public:
     template <typename T>
     T &GetComponent(Entity entity)
     {
+        std::lock_guard<std::mutex> lock(mutex);
         // Get the component array for type T.
         auto componentArray = GetComponentArray<T>();
         // Use the component array to get the component for the entity.
@@ -132,6 +139,7 @@ public:
     template <typename T>
     void RemoveComponent(Entity entity)
     {
+        std::lock_guard<std::mutex> lock(mutex);
         auto componentArray = GetComponentArray<T>(); // Retrieve the appropriate ComponentArray
         if (componentArray)
         {
@@ -142,6 +150,7 @@ public:
 
     void RemoveAllComponents(Entity entity)
     {
+        std::lock_guard<std::mutex> lock(mutex);
         // Iterate over all component types
         for (auto &entry : componentArrays)
         {
@@ -158,11 +167,19 @@ public:
         {
             entry.second.erase(entity);
         }
+        validEntities.erase(entity);
     }
 
     template <typename T>
     const std::unordered_set<Entity> &GetEntitiesWithComponent()
     {
+        std::lock_guard<std::mutex> lock(mutex);
         return entitiesByComponentType[std::type_index(typeid(T))];
+    }
+
+    bool IsValidEntity(Entity entity)
+    {
+        std::lock_guard<std::mutex> lock(mutex);
+        return validEntities.find(entity) != validEntities.end();
     }
 };

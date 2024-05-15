@@ -3,6 +3,7 @@
 #include "TagComponent.h"
 #include "Raycaster.h"
 #include "EntityUpdatedEvent.h"
+#include <mutex>
 
 class SelectCommand
 {
@@ -44,20 +45,31 @@ private:
 class DeselectCommand
 {
 public:
-    DeselectCommand(ComponentManager &componentManager) : componentManager(componentManager){};
+    DeselectCommand(ComponentManager &componentManager) : componentManager(componentManager) {}
+
     void execute()
     {
-        for (auto entity : componentManager.GetEntitiesWithComponent<SelectedComponent>())
+        std::unordered_set<Entity> entities;
         {
-            if (componentManager.HasComponent<SelectedComponent>(entity))
-                componentManager.RemoveComponent<SelectedComponent>(entity);
-            if (componentManager.HasComponent<TagComponent>(entity))
-                componentManager.RemoveComponent<TagComponent>(entity);
+            std::lock_guard<std::mutex> lock(mutex);
+            entities = componentManager.GetEntitiesWithComponent<SelectedComponent>();
+        }
+
+        for (auto entity : entities)
+        {
+            if (componentManager.IsValidEntity(entity))
+            {
+                if (componentManager.HasComponent<SelectedComponent>(entity))
+                    componentManager.RemoveComponent<SelectedComponent>(entity);
+                if (componentManager.HasComponent<TagComponent>(entity))
+                    componentManager.RemoveComponent<TagComponent>(entity);
+            }
         }
     }
 
 private:
     ComponentManager &componentManager;
+    std::mutex mutex;
 };
 
 class MoveCommand
@@ -65,16 +77,22 @@ class MoveCommand
 public:
     MoveCommand(EventBus &eventBus, ComponentManager &componentManager, double x, double y, float screenWidth, float screenHeight, glm::mat4 view, glm::mat4 projection, glm::vec3 cameraPosition)
         : eventBus(eventBus), componentManager(componentManager), x(x), y(y), screenWidth(screenWidth), screenHeight(screenHeight), view(view), projection(projection), cameraPosition(cameraPosition) {}
+
     void execute()
     {
         Raycaster raycaster;
-        glm::vec3 rayDirection = raycaster.screenToWorld(
-            x, y, screenWidth, screenHeight, view, projection);
+        glm::vec3 rayDirection = raycaster.screenToWorld(x, y, screenWidth, screenHeight, view, projection);
         glm::vec3 targetPosition = raycaster.getPointOnVirtualPlane(rayDirection, cameraPosition, -5.0f);
 
-        for (auto entity : componentManager.GetEntitiesWithComponent<SelectedComponent>())
+        std::unordered_set<Entity> entities;
         {
-            if (componentManager.HasComponent<TransformComponent>(entity))
+            std::lock_guard<std::mutex> lock(mutex);
+            entities = componentManager.GetEntitiesWithComponent<SelectedComponent>();
+        }
+
+        for (auto entity : entities)
+        {
+            if (componentManager.IsValidEntity(entity) && componentManager.HasComponent<TransformComponent>(entity))
             {
                 TransformComponent &transformComponent = componentManager.GetComponent<TransformComponent>(entity);
                 transformComponent.position = targetPosition;
@@ -90,4 +108,5 @@ private:
     glm::mat4 view, projection;
     glm::vec3 cameraPosition;
     EventBus &eventBus;
+    std::mutex mutex;
 };
