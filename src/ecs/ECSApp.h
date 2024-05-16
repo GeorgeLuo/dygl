@@ -172,32 +172,6 @@ void OpenGLApp::cursorPositionCallback(GLFWwindow *window, double xpos, double y
     }
 }
 
-// void OpenGLApp::keypressCallback(GLFWwindow *window, int key, int scancode, int action, int mods)
-// {
-//     OpenGLApp *app = static_cast<OpenGLApp *>(glfwGetWindowUserPointer(window));
-//     if (app)
-//     {
-//         if (action == GLFW_PRESS)
-//         {
-//             switch (key)
-//             {
-//             case GLFW_KEY_ESCAPE:
-//                 glfwSetWindowShouldClose(window, GL_TRUE);
-//                 break;
-//             default:
-//                 app->systemManager.GetSystem<TextOverlaySystem>().InputChar(key, "free_type");
-//                 {
-//                     std::ostringstream oss;
-//                     oss << std::fixed << std::setprecision(2) << "pressed (" << getChar(key) << ")";
-//                     std::string formattedString = oss.str();
-//                     app->eventBus.publish(DisplayTextEvent(formattedString, "input_logger", 1.0f, -1.9f, 0.0f));
-//                     break;
-//                 }
-//             }
-//         }
-//     }
-// }
-
 void OpenGLApp::keypressCallback(GLFWwindow *window, int key, int scancode, int action, int mods)
 {
     OpenGLApp *app = static_cast<OpenGLApp *>(glfwGetWindowUserPointer(window));

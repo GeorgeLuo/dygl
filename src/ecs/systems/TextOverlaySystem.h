@@ -82,12 +82,6 @@ void TextOverlaySystem::AddListener(EventBus &bus)
     bus.subscribe<DisplayTextEvent>([this](const DisplayTextEvent &event)
                                     { this->HandleDisplayTextEvent(event); });
 
-    // bus.subscribe<LockTextEvent>([this](const LockTextEvent &event)
-    //                              { this->HandleLockTextEvent(event); });
-
-    // bus.subscribe<DeleteKeyboardEntryEvent>([this](const DeleteKeyboardEntryEvent &event)
-    //                                { this->HandleDeleteTextEvent(event); });
-
     bus.subscribe<KeyboardEntryEvent>([this](const KeyboardEntryEvent &event)
                                       { this->HandleKeyboardEntryEvent(event); });
 }
