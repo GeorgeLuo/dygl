@@ -182,4 +182,6 @@ public:
         std::lock_guard<std::mutex> lock(mutex);
         return validEntities.find(entity) != validEntities.end();
     }
+
+    std::mutex &getMutex() { return mutex; }
 };

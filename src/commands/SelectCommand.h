@@ -66,7 +66,6 @@ public:
             }
         }
     }
-
 private:
     ComponentManager &componentManager;
     std::mutex mutex;

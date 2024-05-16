@@ -3,9 +3,12 @@
 #include "Vertex.h"
 #include <string>
 
-struct DisplayTextEvent : Event {
+struct DisplayTextEvent : Event
+{
     const std::string text;
     const std::string blockname;
     const float x, y, z;
-    DisplayTextEvent(const std::string text, const std::string blockname, float x, float y, float z) : text(text), blockname(blockname), x(x), y(y), z(z) {}
+    bool replace;
+    bool focus;
+    DisplayTextEvent(const std::string text, const std::string blockname, bool replace, bool focus = true, float x = 0.0f, float y = 0.0f, float z = 0.0f) : text(text), blockname(blockname), replace(replace), focus(focus), x(x), y(y), z(z) {}
 };

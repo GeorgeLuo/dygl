@@ -14,6 +14,7 @@
 #include "TextOverlaySystem.h"
 #include <sstream>
 #include <iomanip>
+#include "KeyboardInputSystem.h"
 
 #pragma region ClassDeclaration
 
@@ -62,6 +63,7 @@ OpenGLApp::OpenGLApp(QueueCollection &queueCollection)
     systemManager.AddSystem<MouseSystem>(eventBus, entityManager, componentManager, context);
     systemManager.AddSystem<RenderPreprocessorSystem>(eventBus, componentManager, uniformManager);
     systemManager.AddSystem<TextOverlaySystem>(entityManager, componentManager);
+    systemManager.AddSystem<KeyboardInputSystem>(eventBus);
 }
 
 #pragma endregion
@@ -98,10 +100,8 @@ void OpenGLApp::Initialize()
         exit(-1);
     }
     systemManager.GetSystem<RenderSystem>().Initialize();
-    systemManager.GetSystem<TextOverlaySystem>().Initialize();
-    // systemManager.GetSystem<TextOverlaySystem>().AddListener(eventBus);
-    systemManager.GetSystem<TextOverlaySystem>().AddTextBlock("system_logs", 1.0f, -1.9f, 0.0f);
-    systemManager.GetSystem<TextOverlaySystem>().AddTextBlock("free_type", 0.0f, 0.0f, 0.0f);
+    systemManager.GetSystem<TextOverlaySystem>().Initialize("fonts/Nanum-Gothic-Coding/NanumGothicCoding-Regular.ttf");
+    // systemManager.GetSystem<TextOverlaySystem>().AddTextBlock("free_type", 0.0f, 0.0f, 0.0f);
     systemManager.GetSystem<TextOverlaySystem>().AddListener(eventBus);
 }
 
@@ -148,12 +148,12 @@ void OpenGLApp::staticMouseButtonCallback(GLFWwindow *window, int button, int ac
             double xpos, ypos;
             glfwGetCursorPos(window, &xpos, &ypos);
             app->systemManager.GetSystem<MouseSystem>().handleMouseClick(xpos, ypos);
-
-            std::ostringstream oss;
-            oss << std::fixed << std::setprecision(2) << "clicked (" << xpos << ", " << ypos << ")";
-            std::string formattedString = oss.str();
-
-            app->eventBus.publish(DisplayTextEvent(formattedString, "input_logger", 1.0f, -1.9f, 0.0f));
+            {
+                std::ostringstream oss;
+                oss << std::fixed << std::setprecision(2) << "clicked (" << xpos << ", " << ypos << ")";
+                std::string formattedString = oss.str();
+                app->eventBus.publish(DisplayTextEvent(formattedString, "input_logger", true, false, 1.0f, -1.9f, 0.0f));
+            }
         }
 
         if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_RELEASE)
@@ -172,27 +172,74 @@ void OpenGLApp::cursorPositionCallback(GLFWwindow *window, double xpos, double y
     }
 }
 
+// void OpenGLApp::keypressCallback(GLFWwindow *window, int key, int scancode, int action, int mods)
+// {
+//     OpenGLApp *app = static_cast<OpenGLApp *>(glfwGetWindowUserPointer(window));
+//     if (app)
+//     {
+//         if (action == GLFW_PRESS)
+//         {
+//             switch (key)
+//             {
+//             case GLFW_KEY_ESCAPE:
+//                 glfwSetWindowShouldClose(window, GL_TRUE);
+//                 break;
+//             default:
+//                 app->systemManager.GetSystem<TextOverlaySystem>().InputChar(key, "free_type");
+//                 {
+//                     std::ostringstream oss;
+//                     oss << std::fixed << std::setprecision(2) << "pressed (" << getChar(key) << ")";
+//                     std::string formattedString = oss.str();
+//                     app->eventBus.publish(DisplayTextEvent(formattedString, "input_logger", 1.0f, -1.9f, 0.0f));
+//                     break;
+//                 }
+//             }
+//         }
+//     }
+// }
+
 void OpenGLApp::keypressCallback(GLFWwindow *window, int key, int scancode, int action, int mods)
 {
     OpenGLApp *app = static_cast<OpenGLApp *>(glfwGetWindowUserPointer(window));
     if (app)
     {
-        if (action == GLFW_PRESS)
+        if (action == GLFW_PRESS || action == GLFW_REPEAT)
         {
+            // Check for modifier keys
+            bool shiftPressed = mods & GLFW_MOD_SHIFT;
+            bool ctrlPressed = mods & GLFW_MOD_CONTROL;
+            bool altPressed = mods & GLFW_MOD_ALT;
+            std::string character;
             switch (key)
             {
             case GLFW_KEY_ESCAPE:
                 glfwSetWindowShouldClose(window, GL_TRUE);
                 break;
+            case GLFW_KEY_BACKSPACE:
+                app->systemManager.GetSystem<KeyboardInputSystem>().InputChar(DELETE, INT_MIN, shiftPressed, ctrlPressed, altPressed);
+                character = "DELETE";
+                break;
             default:
-                app->systemManager.GetSystem<TextOverlaySystem>().InputChar(key);
-                std::ostringstream oss;
-                oss << std::fixed << std::setprecision(2) << "pressed (" << getChar(key) << ")";
-                std::string formattedString = oss.str();
+                app->systemManager.GetSystem<KeyboardInputSystem>().InputChar(CHARACTER, key, shiftPressed, ctrlPressed, altPressed);
 
-                app->eventBus.publish(DisplayTextEvent(formattedString, "input_logger", 1.0f, -1.9f, 0.0f));
+                // Map the key to a character, considering shift modifier for uppercase
+                character = shiftPressed ? getShiftedChar(key) : getChar(key);
+                if (character == "\n")
+                {
+                    character = "ENTER";
+                }
                 break;
             }
+            // Log the keypress event
+            std::ostringstream oss;
+            oss << std::fixed << std::setprecision(2)
+                << "pressed (" << character << ")"
+                << (shiftPressed ? " with Shift" : "")
+                << (ctrlPressed ? " with Ctrl" : "")
+                << (altPressed ? " with Alt" : "");
+
+            std::string formattedString = oss.str();
+            app->eventBus.publish(DisplayTextEvent(formattedString, "input_logger", true, false, 0.5f, -1.9f, 0.0f));
         }
     }
 }
