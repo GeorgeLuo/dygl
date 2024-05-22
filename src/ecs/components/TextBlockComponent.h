@@ -1,6 +1,7 @@
 #pragma once
 #include <string>
 #include <vector>
+#include "TextBlockModification.h"
 
 struct TextBlockComponent
 {
@@ -10,6 +11,9 @@ public:
     int texture;
     std::vector<float> color;
 
+    ConcurrentQueue<TextBlockModification> queuedModifications;
+
     TextBlockComponent() = default;
-    TextBlockComponent(const std::string blockname, int texture = 0, std::vector<float> color = {1.0f, 1.0f, 1.0f, 1.0f}) : blockname(blockname), texture(texture), color(color) {}
+    TextBlockComponent(const std::string blockname, int texture = 0, std::vector<float> color = {1.0f, 1.0f, 1.0f, 1.0f}) : blockname(blockname), texture(texture), color(color), queuedModifications() {
+    }
 };

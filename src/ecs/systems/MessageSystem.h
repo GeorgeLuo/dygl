@@ -6,12 +6,11 @@
 #include "TagComponent.h"
 #include "System.h"
 #include <tuple>
-// #include "EventBus.h"
+#include "EventBus.h"
 #include "IdComponent.h"
 #include "EntityCreationMessageV2.h"
 #include "ShaderComponent.h"
 #include "ThreeDComponent.h"
-// #include "UniformComponent.h"
 
 class MessageSystem : public System
 {
@@ -19,23 +18,18 @@ public:
     EntityManager &entityManager;
     ComponentManager &componentManager;
     QueueCollection &queueCollection;
-    // EventBus &eventBus;
+    EventBus &eventBus;
 
-    std::unordered_map<int, Entity> idToEntityMap;
+    void Update(float deltaTime) override;
+
+    std::unordered_map<int, Entity> idAssignmentMap;
 
     // MessageSystem(EntityManager &entityManager, ComponentManager &componentManager, QueueCollection &queueCollection, EventBus &eventBus)
     //     : entityManager(entityManager), componentManager(componentManager), queueCollection(queueCollection), eventBus(eventBus) {}
 
-    MessageSystem(EntityManager &entityManager, ComponentManager &componentManager, QueueCollection &queueCollection)
-        : entityManager(entityManager), componentManager(componentManager), queueCollection(queueCollection) {}
-
-    void Update(float deltaTime) override
+    MessageSystem(EntityManager &entityManager, ComponentManager &componentManager, QueueCollection &queueCollection, EventBus &eventBus)
+        : entityManager(entityManager), componentManager(componentManager), queueCollection(queueCollection), eventBus(eventBus)
     {
-        ProcessCreationMessages();
-        ProcessCreationV2Messages();
-        ProcessDeletionV2Messages();
-        ProcessDeletionMessages();
-        ProcessColorChangeMessages();
     }
 
 private:
@@ -46,15 +40,15 @@ private:
         {
             for (const auto &message : creationMessages)
             {
-                auto it = idToEntityMap.find(message.id);
+                auto it = idAssignmentMap.find(message.id);
 
                 // remaking the entity
-                if (it != idToEntityMap.end())
+                if (it != idAssignmentMap.end())
                 {
                     Entity entity = it->second;
                     componentManager.RemoveAllComponents(entity);
                     entityManager.DestroyEntity(entity);
-                    idToEntityMap.erase(it);
+                    idAssignmentMap.erase(it);
                 }
 
                 Entity newEntity = entityManager.CreateEntity();
@@ -87,7 +81,7 @@ private:
 
                 componentManager.AddComponent(newEntity, colorComponent);
 
-                idToEntityMap[message.id] = newEntity;
+                idAssignmentMap[message.id] = newEntity;
 
                 // TODO: decide if this makes sense
                 entityManager.PublishEntityCreation(newEntity);
@@ -184,7 +178,7 @@ private:
                     componentManager.AddComponent(newEntity, cubeComponent);
                 }
 
-                idToEntityMap[message.id] = newEntity;
+                idAssignmentMap[message.id] = newEntity;
             }
         }
     }
@@ -196,13 +190,13 @@ private:
         {
             for (const auto &message : deletionMessages)
             {
-                auto it = idToEntityMap.find(message.id);
-                if (it != idToEntityMap.end())
+                auto it = idAssignmentMap.find(message.id);
+                if (it != idAssignmentMap.end())
                 {
                     Entity entity = it->second;
                     componentManager.RemoveAllComponents(entity);
                     entityManager.DestroyEntity(entity);
-                    idToEntityMap.erase(it);
+                    idAssignmentMap.erase(it);
                 }
             }
         }
@@ -238,3 +232,12 @@ private:
         }
     }
 };
+
+    void MessageSystem::Update(float deltaTime)
+    {
+        ProcessCreationMessages();
+        ProcessCreationV2Messages();
+        ProcessDeletionV2Messages();
+        ProcessDeletionMessages();
+        ProcessColorChangeMessages();
+    }

@@ -2,11 +2,11 @@
 #include <unordered_map>
 #include <memory>
 #include <typeindex>
-#include "Entity.h"
 #include <array>
 #include <cassert>
 #include <unordered_set>
 #include <mutex>
+#include "Entity.h"
 
 class IComponentArray
 {
@@ -184,4 +184,38 @@ public:
     }
 
     std::mutex &getMutex() { return mutex; }
+
+    // New method to get entities with multiple component types
+    template <typename... ComponentTypes>
+    std::unordered_set<Entity> GetEntitiesWithComponents()
+    {
+        std::lock_guard<std::mutex> lock(mutex);
+
+        std::unordered_set<Entity> result;
+        bool first = true;
+
+        // For each component type, get the set of entities and intersect it with the result
+        ([&](const auto &componentTypeEntities)
+         {
+            std::unordered_set<Entity> componentEntities = entitiesByComponentType[std::type_index(typeid(ComponentTypes))];
+            if (first)
+            {
+                result = componentEntities;
+                first = false;
+            }
+            else
+            {
+                std::unordered_set<Entity> intersection;
+                for (const Entity& entity : result)
+                {
+                    if (componentEntities.find(entity) != componentEntities.end())
+                    {
+                        intersection.insert(entity);
+                    }
+                }
+                result = std::move(intersection);
+            } }(entitiesByComponentType[std::type_index(typeid(ComponentTypes))]), ...);
+
+        return result;
+    }
 };

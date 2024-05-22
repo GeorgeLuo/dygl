@@ -12,15 +12,15 @@ class RenderPreprocessorSystem : public System
 public:
     RenderPreprocessorSystem(EventBus &eventBus, ComponentManager &componentManager, UniformManager &uniformManager);
 
-    // virtual ~RenderPreprocessorSystem() override;
     void AddEntity(Entity entity);
-    void UpdateEntity(Entity entity);
     void Update(float deltaTime) override;
 
 private:
     UniformManager &uniformManager;
     EventBus &eventBus;
     ComponentManager &componentManager;
+
+    void updateEntity(Entity entity);
 };
 
 RenderPreprocessorSystem::RenderPreprocessorSystem(EventBus &eventBus, ComponentManager &componentManager, UniformManager &uniformManager)
@@ -30,7 +30,7 @@ RenderPreprocessorSystem::RenderPreprocessorSystem(EventBus &eventBus, Component
                                                  { this->AddEntity(event.entity); });
 
     this->eventBus.subscribe<EntityUpdatedEvent>([this](const EntityUpdatedEvent &event)
-                                                 { this->UpdateEntity(event.entity); });
+                                                 { this->updateEntity(event.entity); });
 
     this->eventBus.subscribe<EntityDestroyedEvent>([this](const EntityDestroyedEvent &event)
                                                    { this->RemoveEntity(event.entity); });
@@ -115,6 +115,16 @@ void RenderPreprocessorSystem::Update(float deltaTime)
 {
     for (auto entity : this->entities)
     {
+        // if (componentManager.HasComponent<EntityUpdatedComponent>(entity))
+        // {
+        //     updateEntity(entity);
+        // }
+
+        if (componentManager.GetComponent<TransformComponent>(entity).dirty)
+        {
+            updateEntity(entity);
+        }
+
         if (componentManager.HasComponent<GeometryComponent>(entity) && componentManager.HasComponent<RenderComponent>(entity))
         {
             auto &geometry = componentManager.GetComponent<GeometryComponent>(entity);
@@ -144,7 +154,7 @@ void RenderPreprocessorSystem::Update(float deltaTime)
     }
 }
 
-void RenderPreprocessorSystem::UpdateEntity(Entity entity)
+void RenderPreprocessorSystem::updateEntity(Entity entity)
 {
     TransformComponent transform;
     if (componentManager.HasComponent<TransformComponent>(entity))
@@ -154,4 +164,6 @@ void RenderPreprocessorSystem::UpdateEntity(Entity entity)
 
     glm::mat4 modelMatrix = transform.GetModelMatrix();
     uniformManager.StoreEntityUniforms(entity, "model", modelMatrix);
+
+    transform.dirty = false;
 }

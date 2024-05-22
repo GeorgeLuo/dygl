@@ -66,6 +66,7 @@ public:
             }
         }
     }
+
 private:
     ComponentManager &componentManager;
     std::mutex mutex;
@@ -74,8 +75,8 @@ private:
 class MoveCommand
 {
 public:
-    MoveCommand(EventBus &eventBus, ComponentManager &componentManager, double x, double y, float screenWidth, float screenHeight, glm::mat4 view, glm::mat4 projection, glm::vec3 cameraPosition)
-        : eventBus(eventBus), componentManager(componentManager), x(x), y(y), screenWidth(screenWidth), screenHeight(screenHeight), view(view), projection(projection), cameraPosition(cameraPosition) {}
+    MoveCommand(ComponentManager &componentManager, double x, double y, float screenWidth, float screenHeight, glm::mat4 view, glm::mat4 projection, glm::vec3 cameraPosition)
+        : componentManager(componentManager), x(x), y(y), screenWidth(screenWidth), screenHeight(screenHeight), view(view), projection(projection), cameraPosition(cameraPosition) {}
 
     void execute()
     {
@@ -95,7 +96,7 @@ public:
             {
                 TransformComponent &transformComponent = componentManager.GetComponent<TransformComponent>(entity);
                 transformComponent.position = targetPosition;
-                eventBus.publish(EntityUpdatedEvent(entity));
+                transformComponent.dirty = true;
             }
         }
     }
@@ -106,6 +107,5 @@ private:
     float screenWidth, screenHeight;
     glm::mat4 view, projection;
     glm::vec3 cameraPosition;
-    EventBus &eventBus;
     std::mutex mutex;
 };

@@ -9,6 +9,8 @@ struct TransformComponent
     glm::vec3 scale;
     glm::vec3 rotation;
 
+    bool dirty;
+
     // Constructor to initialize the position, scale, and rotation
     TransformComponent(float x = 0.0f, float y = 0.0f, float z = 0.0f,
                        float scaleX = 1.0f, float scaleY = 1.0f,

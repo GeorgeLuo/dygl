@@ -58,12 +58,13 @@ OpenGLApp::OpenGLApp(QueueCollection &queueCollection)
       uniformManager(context, componentManager),
       systemManager()
 {
+    systemManager.AddSystem<MessageSystem>(entityManager, componentManager, queueCollection, eventBus);
+    systemManager.AddSystem<MouseSystem>(entityManager, componentManager, context);
+    systemManager.AddSystem<KeyboardInputSystem>(eventBus, entityManager, componentManager);
+
     systemManager.AddSystem<RenderSystem>(eventBus, context, uniformManager);
-    systemManager.AddSystem<MessageSystem>(entityManager, componentManager, queueCollection);
-    systemManager.AddSystem<MouseSystem>(eventBus, entityManager, componentManager, context);
     systemManager.AddSystem<RenderPreprocessorSystem>(eventBus, componentManager, uniformManager);
     systemManager.AddSystem<TextOverlaySystem>(entityManager, componentManager);
-    systemManager.AddSystem<KeyboardInputSystem>(eventBus);
 }
 
 #pragma endregion
@@ -117,9 +118,26 @@ void OpenGLApp::Run()
     {
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        systemManager.GetSystem<MessageSystem>().Update(0.016f);
-        // systemManager.GetSystem<RenderSystem>().UpdateV3(0.016f, componentManager);
-        systemManager.GetSystem<RenderPreprocessorSystem>().Update(0.016f);
+        float delta = 0.016f;
+
+        // input type systems
+        systemManager.GetSystem<MessageSystem>().Update(delta);
+        // mouse system
+        systemManager.GetSystem<MouseSystem>().Update(delta);
+        // keyboard system
+        systemManager.GetSystem<KeyboardInputSystem>().Update(delta);
+
+        // input processing system? game logic system?
+
+        systemManager.GetSystem<TextOverlaySystem>().Update(delta);
+
+        // scene model computation type systems
+        // text overlay
+        // animations
+
+        // visualization type systems
+        systemManager.GetSystem<RenderPreprocessorSystem>()
+            .Update(0.016f);
         systemManager.GetSystem<RenderSystem>().UpdateV4(0.016f, componentManager);
         glfwSwapBuffers(window);
         glfwPollEvents();
@@ -143,22 +161,28 @@ void OpenGLApp::staticMouseButtonCallback(GLFWwindow *window, int button, int ac
     OpenGLApp *app = static_cast<OpenGLApp *>(glfwGetWindowUserPointer(window));
     if (app)
     {
+        bool shiftPressed = mods & GLFW_MOD_SHIFT;
+        bool ctrlPressed = mods & GLFW_MOD_CONTROL;
+        bool altPressed = mods & GLFW_MOD_ALT;
+
         if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS)
         {
             double xpos, ypos;
             glfwGetCursorPos(window, &xpos, &ypos);
-            app->systemManager.GetSystem<MouseSystem>().handleMouseClick(xpos, ypos);
+            app->systemManager.GetSystem<MouseSystem>().LeftPress(xpos, ypos, shiftPressed, ctrlPressed, altPressed);
             {
                 std::ostringstream oss;
                 oss << std::fixed << std::setprecision(2) << "clicked (" << xpos << ", " << ypos << ")";
                 std::string formattedString = oss.str();
-                app->eventBus.publish(DisplayTextEvent(formattedString, "input_logger", true, false, 1.0f, -1.9f, 0.0f));
+                app->eventBus.publish(DisplayTextEvent(formattedString, "input_logger", true, false, -2.6f, -1.9f, 0.0f));
             }
         }
 
         if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_RELEASE)
         {
-            app->systemManager.GetSystem<MouseSystem>().handleMouseRelease();
+            double xpos, ypos;
+            glfwGetCursorPos(window, &xpos, &ypos);
+            app->systemManager.GetSystem<MouseSystem>().LeftRelease(xpos, ypos);
         }
     }
 }
@@ -168,7 +192,7 @@ void OpenGLApp::cursorPositionCallback(GLFWwindow *window, double xpos, double y
     OpenGLApp *app = static_cast<OpenGLApp *>(glfwGetWindowUserPointer(window));
     if (app)
     {
-        app->systemManager.GetSystem<MouseSystem>().handleMouseMove(xpos, ypos);
+        app->systemManager.GetSystem<MouseSystem>().Move(xpos, ypos);
     }
 }
 
@@ -184,23 +208,30 @@ void OpenGLApp::keypressCallback(GLFWwindow *window, int key, int scancode, int 
             bool ctrlPressed = mods & GLFW_MOD_CONTROL;
             bool altPressed = mods & GLFW_MOD_ALT;
             std::string character;
+
+            app->systemManager.GetSystem<KeyboardInputSystem>().KeyPress(key, shiftPressed, ctrlPressed, altPressed);
+
             switch (key)
             {
             case GLFW_KEY_ESCAPE:
                 glfwSetWindowShouldClose(window, GL_TRUE);
                 break;
             case GLFW_KEY_BACKSPACE:
-                app->systemManager.GetSystem<KeyboardInputSystem>().InputChar(DELETE, INT_MIN, shiftPressed, ctrlPressed, altPressed);
+                // app->systemManager.GetSystem<KeyboardInputSystem>().InputChar(DELETE, INT_MIN, shiftPressed, ctrlPressed, altPressed);
                 character = "DELETE";
                 break;
             default:
-                app->systemManager.GetSystem<KeyboardInputSystem>().InputChar(CHARACTER, key, shiftPressed, ctrlPressed, altPressed);
+                // app->systemManager.GetSystem<KeyboardInputSystem>().InputChar(CHARACTER, key, shiftPressed, ctrlPressed, altPressed);
 
                 // Map the key to a character, considering shift modifier for uppercase
                 character = shiftPressed ? getShiftedChar(key) : getChar(key);
                 if (character == "\n")
                 {
                     character = "ENTER";
+                }
+                if (character == " ")
+                {
+                    character = "SPACEBAR";
                 }
                 break;
             }
@@ -213,7 +244,11 @@ void OpenGLApp::keypressCallback(GLFWwindow *window, int key, int scancode, int 
                 << (altPressed ? " with Alt" : "");
 
             std::string formattedString = oss.str();
-            app->eventBus.publish(DisplayTextEvent(formattedString, "input_logger", true, false, 0.5f, -1.9f, 0.0f));
+            app->eventBus.publish(DisplayTextEvent(formattedString, "input_logger", true, false, -2.6f, -1.9f, 0.0f));
+        }
+        else if (action == GLFW_RELEASE)
+        {
+            // app->systemManager.GetSystem<KeyboardInputSystem>().KeyRelease(key, shiftPressed, ctrlPressed, altPressed);
         }
     }
 }

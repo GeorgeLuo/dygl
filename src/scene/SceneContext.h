@@ -3,6 +3,8 @@
 #include <gtc/matrix_transform.hpp>
 #include <tuple>
 
+// TODO: make this thread-safe with mutex protections
+
 class SceneContext
 {
 public:

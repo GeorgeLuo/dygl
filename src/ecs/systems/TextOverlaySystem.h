@@ -5,8 +5,21 @@
 #include "TransformComponent.h"
 #include "DisplayTextEvent.h"
 #include "TextBlockComponent.h"
-#include "KeyboardEntryEvent.h"
+#include "TextBlockModification.h"
 #include "Text.h"
+
+/**
+ * TextOverlaySystem is responsible for finalizing text based entities for
+ * pre-rendering. Systems that precede this may include the keyboard input
+ * or message system, and the text overlay system rectifies all the changes
+ * from these interfaces.
+ *
+ * The owned entities of this system will be all text based entities.
+ */
+
+// TODO: add expiration feature
+
+// TODO: use commands when writing through entity and component managers
 
 class TextOverlaySystem : public System
 {
@@ -23,7 +36,7 @@ public:
     void ClearBlock(const std::string blockname);
     void ClearBlock(Entity entity);
 
-    Entity AddTextBlock(const std::string blockname, float x, float y, float z, float scaleX = 0.002f, float scaleY = 0.002f);
+    Entity AddTextBlock(const std::string blockname, float x, float y, float z, float scaleX = 0.0018f, float scaleY = 0.0018f);
     Entity GetEntityByBlockname(const std::string blockname);
 
     Entity AppendText(const std::string blockname, const std::string &text);
@@ -34,7 +47,7 @@ public:
     void PublishBlock(Entity entity);
 
     void HandleDisplayTextEvent(const DisplayTextEvent &event);
-    void HandleKeyboardEntryEvent(const KeyboardEntryEvent &event);
+    void HandleKeyboardEntryEvent(const TextBlockModification &event);
 
     void InputChar(int character, const std::string blockname);
     void AddListener(EventBus &bus);
@@ -53,9 +66,55 @@ void TextOverlaySystem::Initialize(const std::string fontfile)
 
 void TextOverlaySystem::Update(float deltaTime)
 {
-    for (auto entity : this->entities)
+    auto entities = componentManager.GetEntitiesWithComponents<TextBlockComponent>();
+    for (Entity entity : entities)
     {
-        // reset the vertices for the entity's textblock component
+        auto &textBlockComponent = componentManager.GetComponent<TextBlockComponent>(entity);
+
+        bool publish;
+        if (textBlockComponent.queuedModifications.Size())
+        {
+            publish = true;
+            // handle the modified text blocks
+            TextBlockModification modification;
+            while (textBlockComponent.queuedModifications.TryPop(modification))
+            {
+                if (modification.entryType == CHARACTER)
+                {
+                    textBlockComponent.textblock += modification.text;
+                }
+                else if (modification.entryType == DELETE)
+                {
+                    if (textBlockComponent.textblock.size() >= 1)
+                        textBlockComponent.textblock.erase(textBlockComponent.textblock.size() - 1, 1);
+                }
+            }
+        }
+        // newly encountered textblock basically, should check for display flag
+        if (!componentManager.HasComponent<ShaderComponent>(entity))
+        {
+            componentManager.AddComponent(entity, ShaderComponent("shaders/vertex/textOverlay.vert", "shaders/fragment/textOverlay.frag"));
+            publish = true;
+        }
+        if (!componentManager.HasComponent<GeometryComponent>(entity))
+        {
+            componentManager.AddComponent(entity, GeometryComponent(std::vector<Vertex>()));
+            publish = true;
+        }
+        if (!componentManager.HasComponent<TextureComponent>(entity))
+        {
+            componentManager.AddComponent(entity, TextureComponent(textureAtlasID));
+            publish = true;
+        }
+        if (!componentManager.HasComponent<TransformComponent>(entity))
+        {
+            componentManager.AddComponent(entity, TransformComponent(0.0f, 0.0f, 0.0f, 0.0018f, 0.0018f));
+            publish = true;
+        }
+        if (publish)
+        {
+            PublishBlock(entity);
+        }
     }
 }
 
@@ -82,11 +141,11 @@ void TextOverlaySystem::AddListener(EventBus &bus)
     bus.subscribe<DisplayTextEvent>([this](const DisplayTextEvent &event)
                                     { this->HandleDisplayTextEvent(event); });
 
-    bus.subscribe<KeyboardEntryEvent>([this](const KeyboardEntryEvent &event)
-                                      { this->HandleKeyboardEntryEvent(event); });
+    bus.subscribe<TextBlockModification>([this](const TextBlockModification &event)
+                                         { this->HandleKeyboardEntryEvent(event); });
 }
 
-void TextOverlaySystem::HandleKeyboardEntryEvent(const KeyboardEntryEvent &event)
+void TextOverlaySystem::HandleKeyboardEntryEvent(const TextBlockModification &event)
 {
     if (event.entryType == ENTER)
     {
@@ -189,7 +248,7 @@ void TextOverlaySystem::ClearBlock(Entity entity)
     component.textblock.clear();
 }
 
-// TODO: use a map here
+// TODO: use a map here (if this gets used often)
 Entity TextOverlaySystem::GetEntityByBlockname(const std::string blockname)
 {
     // find the block by blockname
@@ -257,6 +316,7 @@ void TextOverlaySystem::AppendText(Entity entity, const std::string &text)
     }
 }
 
+// TODO: audit this, probably okay does not use eventbus
 void TextOverlaySystem::PublishBlock(Entity entity)
 {
     TextBlockComponent &block = componentManager.GetComponent<TextBlockComponent>(entity);

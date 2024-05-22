@@ -30,6 +30,8 @@ private:
     std::mutex mutex;
 
 public:
+    Entity CreateEntity();
+
     EntityManager(EventBus &eventBus) : livingEntityCount(0), eventBus(eventBus)
     {
         for (Entity entity = 0; entity < MAX_ENTITIES; ++entity)
@@ -38,29 +40,33 @@ public:
         }
     }
 
-    Entity CreateEntity()
-    {
-        std::lock_guard<std::mutex> lock(mutex);
-        assert(!availableEntities.empty() && "Too many entities.");
-        Entity id = availableEntities.front();
-        availableEntities.pop();
-        ++livingEntityCount;
+    void PublishEntityCreation(Entity entity);
 
-        return id;
-    }
-
-    void PublishEntityCreation(Entity entity)
-    {
-        eventBus.publish(EntityCreatedEvent(entity));
-    }
-
-    void DestroyEntity(Entity entity)
-    {
-        std::lock_guard<std::mutex> lock(mutex);
-        assert(entity < MAX_ENTITIES && "Entity out of range.");
-        availableEntities.push(entity);
-        --livingEntityCount;
-
-        eventBus.publish(EntityDestroyedEvent(entity));
-    }
+    void DestroyEntity(Entity entity);
 };
+
+Entity EntityManager::CreateEntity()
+{
+    std::lock_guard<std::mutex> lock(mutex);
+    assert(!availableEntities.empty() && "Too many entities.");
+    Entity id = availableEntities.front();
+    availableEntities.pop();
+    ++livingEntityCount;
+
+    return id;
+}
+
+void EntityManager::PublishEntityCreation(Entity entity)
+{
+    eventBus.publish(EntityCreatedEvent(entity));
+}
+
+void EntityManager::DestroyEntity(Entity entity)
+{
+    std::lock_guard<std::mutex> lock(mutex);
+    assert(entity < MAX_ENTITIES && "Entity out of range.");
+    availableEntities.push(entity);
+    --livingEntityCount;
+
+    eventBus.publish(EntityDestroyedEvent(entity));
+}
