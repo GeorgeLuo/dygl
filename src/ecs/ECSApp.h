@@ -15,6 +15,8 @@
 #include <sstream>
 #include <iomanip>
 #include "KeyboardInputSystem.h"
+#include "LoggingSystem.h"
+#include "SystemLogger.h"
 
 #pragma region ClassDeclaration
 
@@ -42,6 +44,8 @@ private:
     QueueCollection &queueCollection;
 
     SceneContext context;
+    SystemLogger logger;
+
     UniformManager uniformManager;
 
     GLFWwindow *window;
@@ -58,13 +62,22 @@ OpenGLApp::OpenGLApp(QueueCollection &queueCollection)
       uniformManager(context, componentManager),
       systemManager()
 {
+    // input
     systemManager.AddSystem<MessageSystem>(entityManager, componentManager, queueCollection, eventBus);
     systemManager.AddSystem<MouseSystem>(entityManager, componentManager, context);
-    systemManager.AddSystem<KeyboardInputSystem>(eventBus, entityManager, componentManager);
+    systemManager.AddSystem<KeyboardInputSystem>(&logger, entityManager, componentManager);
 
+    // business logic - modifications to entities triggered by inputs
+    // systemManager.AddSystem<LabelingSystem>(componentManager, uniformManager);
+
+    systemManager.AddSystem<TextOverlaySystem>(entityManager, componentManager);
+
+    // render
     systemManager.AddSystem<RenderSystem>(eventBus, context, uniformManager);
     systemManager.AddSystem<RenderPreprocessorSystem>(eventBus, componentManager, uniformManager);
-    systemManager.AddSystem<TextOverlaySystem>(entityManager, componentManager);
+
+    // internals
+    systemManager.AddSystem<LoggingSystem>(entityManager, componentManager, &logger);
 }
 
 #pragma endregion
@@ -103,7 +116,7 @@ void OpenGLApp::Initialize()
     systemManager.GetSystem<RenderSystem>().Initialize();
     systemManager.GetSystem<TextOverlaySystem>().Initialize("fonts/Nanum-Gothic-Coding/NanumGothicCoding-Regular.ttf");
     // systemManager.GetSystem<TextOverlaySystem>().AddTextBlock("free_type", 0.0f, 0.0f, 0.0f);
-    systemManager.GetSystem<TextOverlaySystem>().AddListener(eventBus);
+    // systemManager.GetSystem<TextOverlaySystem>().AddListener(eventBus);
 }
 
 void OpenGLApp::Run()
@@ -139,6 +152,9 @@ void OpenGLApp::Run()
         systemManager.GetSystem<RenderPreprocessorSystem>()
             .Update(0.016f);
         systemManager.GetSystem<RenderSystem>().UpdateV4(0.016f, componentManager);
+
+        systemManager.GetSystem<LoggingSystem>().Update(0.016f);
+
         glfwSwapBuffers(window);
         glfwPollEvents();
     }
@@ -174,7 +190,7 @@ void OpenGLApp::staticMouseButtonCallback(GLFWwindow *window, int button, int ac
                 std::ostringstream oss;
                 oss << std::fixed << std::setprecision(2) << "clicked (" << xpos << ", " << ypos << ")";
                 std::string formattedString = oss.str();
-                app->eventBus.publish(DisplayTextEvent(formattedString, "input_logger", true, false, -2.6f, -1.9f, 0.0f));
+                app->logger.Log(formattedString, "log_input_logger");
             }
         }
 
@@ -244,7 +260,7 @@ void OpenGLApp::keypressCallback(GLFWwindow *window, int key, int scancode, int 
                 << (altPressed ? " with Alt" : "");
 
             std::string formattedString = oss.str();
-            app->eventBus.publish(DisplayTextEvent(formattedString, "input_logger", true, false, -2.6f, -1.9f, 0.0f));
+            app->logger.Log(formattedString, "log_input_logger");
         }
         else if (action == GLFW_RELEASE)
         {

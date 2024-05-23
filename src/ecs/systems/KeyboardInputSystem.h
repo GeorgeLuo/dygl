@@ -4,6 +4,7 @@
 #include "DisplayTextEvent.h"
 #include "TextBlockModification.h"
 #include "InFocusComponent.h"
+#include "SystemLogger.h"
 
 /**
  * KeyboardInputSystem is responsible for taking keyboard input values (as int)
@@ -59,15 +60,15 @@ std::string modeToString(KeyboardEntryMode mode)
 class KeyboardInputSystem : public System
 {
 public:
-    EventBus &debugLoggerBus;
-
-    KeyboardInputSystem(EventBus &eventBus, EntityManager &entityManager, ComponentManager &componentManager);
+    KeyboardInputSystem(EntityManager &entityManager, ComponentManager &componentManager);
+    KeyboardInputSystem(SystemLogger *logger, EntityManager &entityManager, ComponentManager &componentManager);
     void KeyPress(int character, bool shiftPressed, bool ctrlPressed, bool altPressed);
     void Update(float deltaTime) override;
 
 private:
     KeyboardEntryMode mode;
     ConcurrentQueue<KeyboardAction> keyboardActionQueue;
+
     void inputChar(KeyboardEntryMode modeAtInput, TextBlockModificationType entryType, int character, bool shiftPressed, bool ctrlPressed, bool altPressed);
 
     // TODO: for mode safety
@@ -77,7 +78,9 @@ private:
     ComponentManager &componentManager;
 };
 
-KeyboardInputSystem::KeyboardInputSystem(EventBus &eventBus, EntityManager &entityManager, ComponentManager &componentManager) : debugLoggerBus(eventBus), entityManager(entityManager), componentManager(componentManager) {}
+KeyboardInputSystem::KeyboardInputSystem(EntityManager &entityManager, ComponentManager &componentManager) : entityManager(entityManager), componentManager(componentManager) {}
+
+KeyboardInputSystem::KeyboardInputSystem(SystemLogger *logger, EntityManager &entityManager, ComponentManager &componentManager) : System(logger), entityManager(entityManager), componentManager(componentManager) {}
 
 void KeyboardInputSystem::KeyPress(int character, bool shiftPressed, bool ctrlPressed, bool altPressed)
 {
@@ -123,7 +126,6 @@ void KeyboardInputSystem::Update(float deltaTime)
                 << (keyboardAction.altPressed ? " with Alt" : "");
 
             std::string formattedString = oss.str();
-            // app->eventBus.publish(DisplayTextEvent(formattedString, "input_logger", true, false, -2.6f, -1.9f, 0.0f));
             // tell text overlay system to update the input_logger block via queue(?)
         }
     }
@@ -152,7 +154,7 @@ void KeyboardInputSystem::inputChar(KeyboardEntryMode modeAtInput, TextBlockModi
         }
 
         std::string formattedString = "switched to " + modeToString(mode) + " mode";
-        debugLoggerBus.publish(DisplayTextEvent(formattedString, "mode_change", true, false, -2.6f, -1.7f, 0.0f));
+        Log(formattedString, "log_input_logger");
         return;
     }
     else
@@ -193,7 +195,6 @@ void KeyboardInputSystem::inputChar(KeyboardEntryMode modeAtInput, TextBlockModi
         }
 
         std::string realC = shiftPressed ? getShiftedChar(character) : getChar(character);
-        // debugLoggerBus.publish(TextBlockModification(entryType, realC));
 
         auto entities = componentManager.GetEntitiesWithComponents<InFocusComponent, TextBlockComponent>();
         if (entities.size() == 0)
@@ -214,7 +215,7 @@ void KeyboardInputSystem::inputChar(KeyboardEntryMode modeAtInput, TextBlockModi
             if (componentManager.HasComponent<TextBlockComponent>(entity))
             {
                 TextBlockComponent &textBlockComponent = componentManager.GetComponent<TextBlockComponent>(entity);
-                textBlockComponent.queuedModifications.Push(TextBlockModification(entryType, realC));
+                textBlockComponent.queuedModifications.push(TextBlockModification(entryType, realC));
             }
         }
     }

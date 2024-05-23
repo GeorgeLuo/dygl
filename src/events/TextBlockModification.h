@@ -1,5 +1,4 @@
 #pragma once
-#include "Event.h"
 #include <string>
 
 enum TextBlockModificationType
@@ -7,11 +6,12 @@ enum TextBlockModificationType
     CHARACTER,
     DELETE,
     ENTER,
+    SPACEBAR,
     PASTE,
-    SPACEBAR
+    REPLACE
 };
 
-struct TextBlockModification : public Event
+struct TextBlockModification
 {
 public:
     TextBlockModificationType entryType;

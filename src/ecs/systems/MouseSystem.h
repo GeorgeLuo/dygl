@@ -68,7 +68,9 @@ void MouseSystem::Update(float deltaTime)
         else if (mouseAction.mouseActionType == LEFT_RELEASE)
         {
             handleLeftRelease(mouseAction.xpos, mouseAction.ypos);
-        } else {
+        }
+        else
+        {
             assert("unhandled mouse operation");
         }
     }
