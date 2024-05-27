@@ -170,6 +170,43 @@ public:
         validEntities.erase(entity);
     }
 
+    template <typename... ComponentTypes>
+    Entity GetEntityWithComponent()
+    {
+        std::lock_guard<std::mutex> lock(mutex);
+
+        std::unordered_set<Entity> result;
+        bool first = true;
+
+        ([&](const auto &componentTypeEntities)
+         {
+            std::unordered_set<Entity> componentEntities = entitiesByComponentType[std::type_index(typeid(ComponentTypes))];
+            if (first)
+            {
+                result = componentEntities;
+                first = false;
+            }
+            else
+            {
+                std::unordered_set<Entity> intersection;
+                for (const Entity &entity : result)
+                {
+                    if (componentEntities.find(entity) != componentEntities.end())
+                    {
+                        intersection.insert(entity);
+                    }
+                }
+                result = std::move(intersection);
+            } }(entitiesByComponentType[std::type_index(typeid(ComponentTypes))]), ...);
+
+        if (!result.empty())
+        {
+            return *result.begin();
+        }
+
+        return INVALID_ENTITY;
+    }
+
     template <typename T>
     const std::unordered_set<Entity> &GetEntitiesWithComponent()
     {

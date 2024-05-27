@@ -58,7 +58,7 @@ Entity EntityManager::CreateEntity()
 
 void EntityManager::PublishEntityCreation(Entity entity)
 {
-    eventBus.publish(EntityCreatedEvent(entity));
+    // eventBus.publish(EntityCreatedEvent(entity));
 }
 
 void EntityManager::DestroyEntity(Entity entity)

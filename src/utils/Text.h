@@ -32,8 +32,7 @@ const std::unordered_map<int, std::string> shiftedKeys = {
     {GLFW_KEY_GRAVE_ACCENT, "~"},
     {GLFW_KEY_COMMA, "<"},
     {GLFW_KEY_PERIOD, ">"},
-    {GLFW_KEY_SLASH, "?"}
-};
+    {GLFW_KEY_SLASH, "?"}};
 
 // Return char from keycode
 const std::string getChar(int key)
@@ -162,21 +161,35 @@ std::string getShiftedChar(int key)
     return getChar(key);
 }
 
+// TODO: move this somewhere else, maybe params of initialize method
+
+unsigned char *fontBuffer = nullptr;
+float lineHeight = 0.0f;
+float scale;
+
 void initFontSystem(const char *fontPath)
 {
     // Load the font using stb_truetype
-    unsigned char *ttf_buffer = new unsigned char[1 << 20]; // allocate enough memory for the font file
-    // Increase the resolution: Double the dimensions for the temporary bitmap
-    unsigned char *temp_bitmap = new unsigned char[1024 * 1024]; // temporary bitmap for alpha values, now 1024x1024
+    fontBuffer = new unsigned char[1 << 20];                     // Allocate enough memory for the font file
+    unsigned char *temp_bitmap = new unsigned char[1024 * 1024]; // Temporary bitmap for alpha values
+
     // Load font file into memory
     std::ifstream fontFile(fontPath, std::ios::binary);
-    fontFile.read((char *)ttf_buffer, 1 << 20);
+    fontFile.read((char *)fontBuffer, 1 << 20);
     fontFile.close();
-    // Increase the baked font size for higher resolution
-    // Bake the font glyphs into a bitmap using stb_truetype
-    stbtt_BakeFontBitmap(ttf_buffer, 0, 64.0f, temp_bitmap, 1024, 1024, 32, 96, cdata); // Adjusted for 1024x1024 bitmap, font size doubled
-    // Convert the baked bitmap to RGBA format with an adjusted size
-    std::vector<unsigned char> rgba_bitmap(1024 * 1024 * 4); // Adjusted for RGBA, now 1024x1024
+
+    float pixelHeight = 128.0f;
+
+    // Bake the font glyphs into a bitmap
+    // stbtt_BakeFontBitmap(fontBuffer, 0, pixelHeight, temp_bitmap, 1024, 1024, 32, 96, cdata);
+    if (stbtt_BakeFontBitmap(fontBuffer, 0, pixelHeight, temp_bitmap, 1024, 1024, 32, 96, cdata) <= 0)
+    {
+        std::cerr << "Failed to bake font bitmap." << std::endl;
+        return;
+    }
+
+    // Convert the baked bitmap to RGBA format
+    std::vector<unsigned char> rgba_bitmap(1024 * 1024 * 4);
     for (int i = 0; i < (1024 * 1024); ++i)
     {
         rgba_bitmap[i * 4 + 0] = 255;            // R
@@ -184,16 +197,33 @@ void initFontSystem(const char *fontPath)
         rgba_bitmap[i * 4 + 2] = 255;            // B
         rgba_bitmap[i * 4 + 3] = temp_bitmap[i]; // A from the alpha bitmap
     }
+
     // Upload the RGBA bitmap to OpenGL as a texture
     glGenTextures(1, &textureAtlasID);
     glBindTexture(GL_TEXTURE_2D, textureAtlasID);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 1024, 1024, 0, GL_RGBA, GL_UNSIGNED_BYTE, rgba_bitmap.data());
-    // Set texture parameters for filtering and wrapping
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
     // Clean up
-    delete[] ttf_buffer;
     delete[] temp_bitmap;
+
+    stbtt_fontinfo fontInfo;
+    stbtt_InitFont(&fontInfo, fontBuffer, stbtt_GetFontOffsetForIndex(fontBuffer, 0));
+
+    int ascent, descent, lineGap;
+    stbtt_GetFontVMetrics(&fontInfo, &ascent, &descent, &lineGap);
+
+    // Scale ascent, descent, and lineGap based on font size
+    float fontSize = 6.0f; // Adjust based on desired font size
+    scale = stbtt_ScaleForPixelHeight(&fontInfo, pixelHeight);
+
+    lineHeight = (ascent - descent + lineGap) * scale;
+
+    // std::cout << "pixelHeight: " << pixelHeight << " fontSize: " << fontSize << " scale: " << scale << " lineHeight: " << lineHeight << std::endl;
+
+    // TODO: maybe don't do this
+    delete[] fontBuffer;
 }

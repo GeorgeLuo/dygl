@@ -50,7 +50,8 @@ void CheckGLError()
 class RenderSystem : public System
 {
 public:
-    RenderSystem(EventBus &eventBus, SceneContext &context, UniformManager &uniformManager);
+    // RenderSystem(EventBus &eventBus, SceneContext &context, UniformManager &uniformManager);
+    RenderSystem(SceneContext &context, UniformManager &uniformManager);
     void Update(float dt, ComponentManager &componentManager);
     void UpdateV2(float dt, ComponentManager &componentManager);
     void UpdateV3(float dt, ComponentManager &componentManager);
@@ -60,7 +61,7 @@ public:
     // void RemoveEntity(Entity entity);
 
 private:
-    EventBus &eventBus;
+    // EventBus &eventBus;
     SceneContext &sceneContext; // Reference to the shared context
 
     ShaderManager shaderManager;
@@ -75,14 +76,16 @@ private:
     void setupShaderWithEntityData(TransformComponent &transform, float angle);
 };
 
-RenderSystem::RenderSystem(EventBus &eventBus, SceneContext &context, UniformManager &uniformManager)
-    : eventBus(eventBus), sceneContext(context), uniformManager(uniformManager)
+// RenderSystem::RenderSystem(EventBus &eventBus, SceneContext &context, UniformManager &uniformManager)
+//     : eventBus(eventBus), sceneContext(context), uniformManager(uniformManager)
+RenderSystem::RenderSystem(SceneContext &context, UniformManager &uniformManager)
+    : sceneContext(context), uniformManager(uniformManager)
 {
-    this->eventBus.subscribe<EntityCreatedEvent>([this](const EntityCreatedEvent &event)
-                                                 { this->AddEntity(event.entity); });
+    // this->eventBus.subscribe<EntityCreatedEvent>([this](const EntityCreatedEvent &event)
+    //                                              { this->AddEntity(event.entity); });
 
-    this->eventBus.subscribe<EntityDestroyedEvent>([this](const EntityDestroyedEvent &event)
-                                                   { this->RemoveEntity(event.entity); });
+    // this->eventBus.subscribe<EntityDestroyedEvent>([this](const EntityDestroyedEvent &event)
+    //                                                { this->RemoveEntity(event.entity); });
 }
 
 void RenderSystem::setupGeometry(Entity entity, ComponentManager &componentManager)
@@ -131,7 +134,8 @@ void RenderSystem::Initialize()
 
 void RenderSystem::UpdateV4(float dt, ComponentManager &componentManager)
 {
-    for (auto entity : this->entities)
+    // for (auto entity : this->entities)
+    for (auto entity : componentManager.GetEntitiesWithComponents<RenderComponent>())
     {
         if (!componentManager.HasComponent<ShaderComponent>(entity) ||
             !componentManager.HasComponent<RenderComponent>(entity))

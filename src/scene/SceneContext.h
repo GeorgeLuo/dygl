@@ -46,7 +46,7 @@ glm::mat4 SceneContext::getOrthographicProjectionMatrix(float windowWidth = 800.
 {
     // return glm::ortho(0.0f, windowWidth, windowHeight, 0.0f, -1.0f, 1.0f);
     // return glm::ortho(0.0f, 800.0f, 0.0f, 600.0f);
-    return glm::ortho(0.0f, 800.0f, 600.0f, 0.0f, -1.0f, 1.0f);
+    return glm::ortho(0.0f, windowWidth, windowHeight, 0.0f, -1.0f, 1.0f);
 }
 
 void SceneContext::initializeMatrices(float windowWidth, float windowHeight, glm::vec3 cameraPosition)

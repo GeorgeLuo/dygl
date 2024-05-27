@@ -229,6 +229,7 @@ private:
         {
             auto &colorComponent = componentManager.GetComponent<ColorComponent>(entity);
             colorComponent.UpdateColor(); // Gradually update color towards target
+            colorComponent.dirty = true;
         }
     }
 };

@@ -10,38 +10,42 @@
 class RenderPreprocessorSystem : public System
 {
 public:
-    RenderPreprocessorSystem(EventBus &eventBus, ComponentManager &componentManager, UniformManager &uniformManager);
+    // RenderPreprocessorSystem(EventBus &eventBus, ComponentManager &componentManager, UniformManager &uniformManager);
+    RenderPreprocessorSystem(ComponentManager &componentManager, UniformManager &uniformManager);
 
-    void AddEntity(Entity entity);
+    void setupVisibility(Entity entity);
     void Update(float deltaTime) override;
 
 private:
     UniformManager &uniformManager;
-    EventBus &eventBus;
+    // EventBus &eventBus;
     ComponentManager &componentManager;
 
     void updateEntity(Entity entity);
+    void updateEntityColor(Entity entity);
 };
 
-RenderPreprocessorSystem::RenderPreprocessorSystem(EventBus &eventBus, ComponentManager &componentManager, UniformManager &uniformManager)
-    : eventBus(eventBus), componentManager(componentManager), uniformManager(uniformManager)
+// RenderPreprocessorSystem::RenderPreprocessorSystem(EventBus &eventBus, ComponentManager &componentManager, UniformManager &uniformManager)
+//     : eventBus(eventBus), componentManager(componentManager), uniformManager(uniformManager)
+RenderPreprocessorSystem::RenderPreprocessorSystem(ComponentManager &componentManager, UniformManager &uniformManager)
+    : componentManager(componentManager), uniformManager(uniformManager)
 {
-    this->eventBus.subscribe<EntityCreatedEvent>([this](const EntityCreatedEvent &event)
-                                                 { this->AddEntity(event.entity); });
+    // this->eventBus.subscribe<EntityCreatedEvent>([this](const EntityCreatedEvent &event)
+    //                                              { this->AddEntity(event.entity); });
 
-    this->eventBus.subscribe<EntityUpdatedEvent>([this](const EntityUpdatedEvent &event)
-                                                 { this->updateEntity(event.entity); });
+    // this->eventBus.subscribe<EntityUpdatedEvent>([this](const EntityUpdatedEvent &event)
+    //                                              { this->updateEntity(event.entity); });
 
-    this->eventBus.subscribe<EntityDestroyedEvent>([this](const EntityDestroyedEvent &event)
-                                                   { this->RemoveEntity(event.entity); });
+    // this->eventBus.subscribe<EntityDestroyedEvent>([this](const EntityDestroyedEvent &event)
+    //                                                { this->RemoveEntity(event.entity); });
 
-    this->eventBus.subscribe<SceneMetaChangeEvent>([this](const SceneMetaChangeEvent &event)
-                                                   { this->RemoveEntity(event.entity); });
+    // this->eventBus.subscribe<SceneMetaChangeEvent>([this](const SceneMetaChangeEvent &event)
+    //                                                { this->RemoveEntity(event.entity); });
 }
 
-void RenderPreprocessorSystem::AddEntity(Entity entity)
+void RenderPreprocessorSystem::setupVisibility(Entity entity)
 {
-    System::AddEntity(entity);
+    // System::AddEntity(entity);
 
     if (!this->componentManager.HasComponent<RenderComponent>(entity))
     {
@@ -107,18 +111,32 @@ void RenderPreprocessorSystem::AddEntity(Entity entity)
     {
         auto text = componentManager.GetComponent<TextBlockComponent>(entity);
         uniformManager.StoreEntityUniforms(entity, "textTexture", text.texture);
-        uniformManager.StoreEntityUniforms(entity, "textColor", text.color);
+        uniformManager.StoreEntityUniforms(entity, "ourColor", text.color);
     }
 }
 
 void RenderPreprocessorSystem::Update(float deltaTime)
 {
-    for (auto entity : this->entities)
+    // for (auto entity : this->entities)
+    for (auto entity : componentManager.GetEntitiesWithComponent<GeometryComponent>())
     {
         // if (componentManager.HasComponent<EntityUpdatedComponent>(entity))
         // {
         //     updateEntity(entity);
         // }
+
+        // the entity is meant to be rendered by the geometry component but does not
+        // have the renderable component set up
+        // TODO: add a hide component for performance
+        if (!componentManager.HasComponent<RenderComponent>(entity))
+        {
+            setupVisibility(entity);
+        }
+
+        if (componentManager.HasComponent<ColorComponent>(entity) && componentManager.GetComponent<ColorComponent>(entity).dirty)
+        {
+            updateEntityColor(entity);
+        }
 
         if (componentManager.GetComponent<TransformComponent>(entity).dirty)
         {
@@ -156,14 +174,27 @@ void RenderPreprocessorSystem::Update(float deltaTime)
 
 void RenderPreprocessorSystem::updateEntity(Entity entity)
 {
-    TransformComponent transform;
-    if (componentManager.HasComponent<TransformComponent>(entity))
-    {
-        transform = componentManager.GetComponent<TransformComponent>(entity);
-    }
+    // TransformComponent transform;
+    // if (componentManager.HasComponent<TransformComponent>(entity))
+    // {
+    //     transform = componentManager.GetComponent<TransformComponent>(entity);
+    // }
+
+    TransformComponent &transform = componentManager.GetComponent<TransformComponent>(entity);
 
     glm::mat4 modelMatrix = transform.GetModelMatrix();
     uniformManager.StoreEntityUniforms(entity, "model", modelMatrix);
 
     transform.dirty = false;
+}
+
+void RenderPreprocessorSystem::updateEntityColor(Entity entity)
+{
+    if (componentManager.HasComponent<ColorComponent>(entity))
+    {
+        auto &colorComponent = componentManager.GetComponent<ColorComponent>(entity);
+        auto color = std::vector<float>{colorComponent.r, colorComponent.g, colorComponent.b, 1.0f};
+        uniformManager.StoreEntityUniforms(entity, "ourColor", color);
+        colorComponent.dirty = false;
+    }
 }

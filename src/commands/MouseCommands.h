@@ -3,7 +3,42 @@
 #include "TagComponent.h"
 #include "Raycaster.h"
 #include "EntityUpdatedEvent.h"
+#include "GameStateComponent.h"
 #include <mutex>
+
+Entity findEntityAtCoordinates(double x, double y, float screenWidth, float screenHeight, glm::mat4 view, glm::mat4 projection,
+                               glm::vec3 cameraPosition, ComponentManager &componentManager)
+{
+    Raycaster raycaster;
+    glm::vec3 rayDirection = raycaster.screenToWorld(x, y, screenWidth, screenHeight, view, projection);
+    glm::vec3 rayOrigin = cameraPosition;
+    Entity selectedEntity = raycaster.raycast(rayOrigin, rayDirection, componentManager);
+    return selectedEntity;
+}
+
+class FocusCommand
+{
+public:
+    FocusCommand(ComponentManager &componentManager, double x, double y, float screenWidth, float screenHeight, glm::mat4 view, glm::mat4 projection, glm::vec3 cameraPosition)
+        : componentManager(componentManager), x(x), y(y), screenWidth(screenWidth), screenHeight(screenHeight), view(view), projection(projection), cameraPosition(cameraPosition) {}
+
+    void execute()
+    {
+        // find object at x, y coordinate, mark as in focus
+        Entity selectedEntity = findEntityAtCoordinates(x, y, screenWidth, screenHeight, view, projection, cameraPosition, componentManager);
+        if (selectedEntity != INVALID_ENTITY)
+        {
+            componentManager.AddComponent(selectedEntity, SelectedComponent());
+        }
+    }
+
+private:
+    ComponentManager &componentManager;
+    double x, y;
+    float screenWidth, screenHeight;
+    glm::mat4 view, projection;
+    glm::vec3 cameraPosition;
+};
 
 class SelectCommand
 {
@@ -14,7 +49,7 @@ public:
     void execute()
     {
         // Find the entity that corresponds to the click coordinates
-        Entity selectedEntity = findEntityAtCoordinates();
+        Entity selectedEntity = findEntityAtCoordinates(x, y, screenWidth, screenHeight, view, projection, cameraPosition, componentManager);
         if (selectedEntity != INVALID_ENTITY)
         {
             componentManager.AddComponent(selectedEntity, SelectedComponent());
@@ -32,14 +67,14 @@ private:
     glm::vec3 cameraPosition;
 
     // Function to find an entity at the specified coordinates
-    Entity findEntityAtCoordinates()
-    {
-        Raycaster raycaster;
-        glm::vec3 rayDirection = raycaster.screenToWorld(x, y, screenWidth, screenHeight, view, projection);
-        glm::vec3 rayOrigin = cameraPosition;
-        Entity selectedEntity = raycaster.raycast(rayOrigin, rayDirection, componentManager);
-        return selectedEntity;
-    }
+    // Entity findEntityAtCoordinates()
+    // {
+    //     Raycaster raycaster;
+    //     glm::vec3 rayDirection = raycaster.screenToWorld(x, y, screenWidth, screenHeight, view, projection);
+    //     glm::vec3 rayOrigin = cameraPosition;
+    //     Entity selectedEntity = raycaster.raycast(rayOrigin, rayDirection, componentManager);
+    //     return selectedEntity;
+    // }
 };
 
 class DeselectCommand

@@ -15,8 +15,9 @@
 #include <sstream>
 #include <iomanip>
 #include "KeyboardInputSystem.h"
-#include "LoggingSystem.h"
+#include "FeedProcessorSystem.h"
 #include "SystemLogger.h"
+#include "GameStateSystem.h"
 
 #pragma region ClassDeclaration
 
@@ -62,10 +63,12 @@ OpenGLApp::OpenGLApp(QueueCollection &queueCollection)
       uniformManager(context, componentManager),
       systemManager()
 {
+    systemManager.AddSystem<GameStateSystem>(entityManager, componentManager);
+
     // input
     systemManager.AddSystem<MessageSystem>(entityManager, componentManager, queueCollection, eventBus);
     systemManager.AddSystem<MouseSystem>(entityManager, componentManager, context);
-    systemManager.AddSystem<KeyboardInputSystem>(&logger, entityManager, componentManager);
+    systemManager.AddSystem<KeyboardInputSystem>(entityManager, componentManager, &logger);
 
     // business logic - modifications to entities triggered by inputs
     // systemManager.AddSystem<LabelingSystem>(componentManager, uniformManager);
@@ -73,11 +76,11 @@ OpenGLApp::OpenGLApp(QueueCollection &queueCollection)
     systemManager.AddSystem<TextOverlaySystem>(entityManager, componentManager);
 
     // render
-    systemManager.AddSystem<RenderSystem>(eventBus, context, uniformManager);
-    systemManager.AddSystem<RenderPreprocessorSystem>(eventBus, componentManager, uniformManager);
+    systemManager.AddSystem<RenderSystem>(context, uniformManager);
+    systemManager.AddSystem<RenderPreprocessorSystem>(componentManager, uniformManager);
 
     // internals
-    systemManager.AddSystem<LoggingSystem>(entityManager, componentManager, &logger);
+    systemManager.AddSystem<FeedProcessorSystem>(entityManager, componentManager, &logger);
 }
 
 #pragma endregion
@@ -114,9 +117,8 @@ void OpenGLApp::Initialize()
         exit(-1);
     }
     systemManager.GetSystem<RenderSystem>().Initialize();
+    systemManager.GetSystem<GameStateSystem>().Initialize();
     systemManager.GetSystem<TextOverlaySystem>().Initialize("fonts/Nanum-Gothic-Coding/NanumGothicCoding-Regular.ttf");
-    // systemManager.GetSystem<TextOverlaySystem>().AddTextBlock("free_type", 0.0f, 0.0f, 0.0f);
-    // systemManager.GetSystem<TextOverlaySystem>().AddListener(eventBus);
 }
 
 void OpenGLApp::Run()
@@ -132,6 +134,8 @@ void OpenGLApp::Run()
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         float delta = 0.016f;
+
+        systemManager.GetSystem<GameStateSystem>().Update(delta);
 
         // input type systems
         systemManager.GetSystem<MessageSystem>().Update(delta);
@@ -153,7 +157,7 @@ void OpenGLApp::Run()
             .Update(0.016f);
         systemManager.GetSystem<RenderSystem>().UpdateV4(0.016f, componentManager);
 
-        systemManager.GetSystem<LoggingSystem>().Update(0.016f);
+        systemManager.GetSystem<FeedProcessorSystem>().Update(0.016f);
 
         glfwSwapBuffers(window);
         glfwPollEvents();
@@ -200,6 +204,19 @@ void OpenGLApp::staticMouseButtonCallback(GLFWwindow *window, int button, int ac
             glfwGetCursorPos(window, &xpos, &ypos);
             app->systemManager.GetSystem<MouseSystem>().LeftRelease(xpos, ypos);
         }
+
+        if (button == GLFW_MOUSE_BUTTON_RIGHT && action == GLFW_PRESS)
+        {
+            double xpos, ypos;
+            glfwGetCursorPos(window, &xpos, &ypos);
+            app->systemManager.GetSystem<MouseSystem>().RightPress(xpos, ypos, shiftPressed, ctrlPressed, altPressed);
+            {
+                std::ostringstream oss;
+                oss << std::fixed << std::setprecision(2) << "right clicked (" << xpos << ", " << ypos << ")";
+                std::string formattedString = oss.str();
+                app->logger.Log(formattedString, "log_input_logger");
+            }
+        }
     }
 }
 
@@ -233,12 +250,9 @@ void OpenGLApp::keypressCallback(GLFWwindow *window, int key, int scancode, int 
                 glfwSetWindowShouldClose(window, GL_TRUE);
                 break;
             case GLFW_KEY_BACKSPACE:
-                // app->systemManager.GetSystem<KeyboardInputSystem>().InputChar(DELETE, INT_MIN, shiftPressed, ctrlPressed, altPressed);
                 character = "DELETE";
                 break;
             default:
-                // app->systemManager.GetSystem<KeyboardInputSystem>().InputChar(CHARACTER, key, shiftPressed, ctrlPressed, altPressed);
-
                 // Map the key to a character, considering shift modifier for uppercase
                 character = shiftPressed ? getShiftedChar(key) : getChar(key);
                 if (character == "\n")

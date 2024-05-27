@@ -35,6 +35,7 @@ public:
 
     void LeftPress(double xpos, double ypos, bool shiftPressed = false, bool altPressed = false, bool ctrlPressed = false);
     void LeftRelease(double xpos, double ypos);
+    void RightPress(double xpos, double ypos, bool shiftPressed = false, bool altPressed = false, bool ctrlPressed = false);
     void Move(double xpos, double ypos);
 
     MouseSystem(EntityManager &entityManager, ComponentManager &componentManager, SceneContext &sceneContext);
@@ -46,6 +47,7 @@ private:
     void handleLeftPress(double xpos, double ypos);
     void handleMouseMove(double xpos, double ypos);
     void handleLeftRelease(double xpos, double ypos);
+    void handleRightPress(double xpos, double ypos);
 };
 
 MouseSystem::MouseSystem(EntityManager &entityManager, ComponentManager &componentManager, SceneContext &sceneContext) : entityManager(entityManager), componentManager(componentManager), sceneContext(sceneContext)
@@ -86,6 +88,11 @@ void MouseSystem::LeftRelease(double xpos, double ypos)
     mouseActionQueue.Push(MouseAction(LEFT_RELEASE, xpos, ypos));
 }
 
+void MouseSystem::RightPress(double xpos, double ypos, bool shiftPressed, bool altPressed, bool ctrlPressed)
+{
+    mouseActionQueue.Push(MouseAction(RIGHT_PRESS, xpos, ypos));
+}
+
 void MouseSystem::Move(double xpos, double ypos)
 {
     mouseActionQueue.Push(MouseAction(MOVE, xpos, ypos));
@@ -101,6 +108,12 @@ void MouseSystem::handleLeftRelease(double xpos, double ypos)
 {
     DeselectCommand deselectCommand(componentManager);
     deselectCommand.execute();
+}
+
+void MouseSystem::handleRightPress(double xpos, double ypos)
+{
+    FocusCommand focusCommand(componentManager, xpos, ypos, sceneContext.windowWidth, sceneContext.windowHeight, sceneContext.viewMatrix, sceneContext.getPerspectiveProjectionMatrix(), sceneContext.cameraPosition);
+    focusCommand.execute();
 }
 
 void MouseSystem::handleMouseMove(double xpos, double ypos)

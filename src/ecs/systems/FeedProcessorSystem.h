@@ -5,12 +5,14 @@
 #include "TextBlockComponent.h"
 #include "SystemLogger.h"
 #include "TransformComponent.h"
+#include "Text.h"
+#include "BoundingBoxComponent.h"
 
 /**
  * The logging system maps the system logger to renderable entities
  */
 
-// TODO: use a map here (if this gets used often)
+// TODO: use a map here (if this gets used often), also move somewhere more appropriate
 Entity GetEntityByBlockname(ComponentManager &componentManager, const std::string blockname)
 {
     auto entities = componentManager.GetEntitiesWithComponent<TextBlockComponent>();
@@ -32,10 +34,10 @@ enum LogLevel
 
 };
 
-class LoggingSystem : public System
+class FeedProcessorSystem : public System
 {
 public:
-    LoggingSystem(EntityManager &entityManager, ComponentManager &componentManager, SystemLogger *logger);
+    FeedProcessorSystem(EntityManager &entityManager, ComponentManager &componentManager, SystemLogger *logger);
     void Update(float deltaTime) override;
 
 private:
@@ -43,11 +45,11 @@ private:
     ComponentManager &componentManager;
 };
 
-LoggingSystem::LoggingSystem(EntityManager &entityManager, ComponentManager &componentManager, SystemLogger *logger) : System(logger), entityManager(entityManager), componentManager(componentManager)
+FeedProcessorSystem::FeedProcessorSystem(EntityManager &entityManager, ComponentManager &componentManager, SystemLogger *logger) : System(logger), entityManager(entityManager), componentManager(componentManager)
 {
 }
 
-void LoggingSystem::Update(float deltaTime)
+void FeedProcessorSystem::Update(float deltaTime)
 {
     Loggable loggable;
     while (logger->TryPop(loggable))
@@ -61,7 +63,10 @@ void LoggingSystem::Update(float deltaTime)
             // create the entity to contain the text block
             entity = entityManager.CreateEntity();
             componentManager.AddComponent(entity, TextBlockComponent(blockname));
-            componentManager.AddComponent(entity, TransformComponent(-2.6f, -1.9f, 0.0f, 0.0018f, 0.0018f));
+            // componentManager.AddComponent(entity, TransformComponent(-2.6f, -1.9f, 0.0f, scale, scale));
+            // componentManager.AddComponent(entity, TransformComponent(-2.6f, -1.9f, 0.0f, 0.004f, 0.004f));
+            componentManager.AddComponent(entity, TransformComponent(-2.6f, -1.9f, 0.0f));
+            componentManager.AddComponent(entity, BoundingBoxComponent(-2.6f, -1.9f, 3000, 1000));
             entityManager.PublishEntityCreation(entity);
         }
 

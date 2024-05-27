@@ -8,6 +8,8 @@ struct ColorComponent
     float targetR, targetG, targetB;
     float interpolationSpeed;
 
+    bool dirty;
+
     ColorComponent(float r = 1.0f, float g = 1.0f, float b = 1.0f, float interpolationSpeed = 0.01f)
         : r(r), g(g), b(b), targetR(r), targetG(g), targetB(b), interpolationSpeed(interpolationSpeed) {}
 

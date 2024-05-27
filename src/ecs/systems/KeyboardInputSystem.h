@@ -5,6 +5,7 @@
 #include "TextBlockModification.h"
 #include "InFocusComponent.h"
 #include "SystemLogger.h"
+#include "GameStateComponent.h"
 
 /**
  * KeyboardInputSystem is responsible for taking keyboard input values (as int)
@@ -22,73 +23,48 @@ enum KeyboardActionType
     PRESS
 };
 
-enum KeyboardEntryMode
-{
-    FREE_TYPE,
-    ENTITY_MANAGEMENT,
-    ROAM
-};
-
 struct KeyboardAction
 {
 public:
-    KeyboardEntryMode mode;
+    GameMode mode;
+
     KeyboardActionType keyboardActionType;
 
     int character;
     bool shiftPressed, ctrlPressed, altPressed;
 
     KeyboardAction() = default;
-    KeyboardAction(KeyboardEntryMode mode, KeyboardActionType keyboardActionType, int character, bool shiftPressed, bool ctrlPressed, bool altPressed) : mode(mode), keyboardActionType(keyboardActionType), character(character), shiftPressed(shiftPressed), ctrlPressed(ctrlPressed), altPressed(ctrlPressed){};
+    KeyboardAction(GameMode mode, KeyboardActionType keyboardActionType, int character, bool shiftPressed, bool ctrlPressed, bool altPressed) : mode(mode), keyboardActionType(keyboardActionType), character(character), shiftPressed(shiftPressed), ctrlPressed(ctrlPressed), altPressed(ctrlPressed){};
 };
-
-std::string modeToString(KeyboardEntryMode mode)
-{
-    switch (mode)
-    {
-    case FREE_TYPE:
-        return "FREE_TYPE";
-    case ENTITY_MANAGEMENT:
-        return "ENTITY_MANAGEMENT";
-    case ROAM:
-        return "ROAM";
-    default:
-        return "UNKNOWN";
-    }
-}
 
 class KeyboardInputSystem : public System
 {
 public:
-    KeyboardInputSystem(EntityManager &entityManager, ComponentManager &componentManager);
-    KeyboardInputSystem(SystemLogger *logger, EntityManager &entityManager, ComponentManager &componentManager);
+    KeyboardInputSystem(EntityManager &entityManager, ComponentManager &componentManager, SystemLogger *logger);
     void KeyPress(int character, bool shiftPressed, bool ctrlPressed, bool altPressed);
     void Update(float deltaTime) override;
 
 private:
-    KeyboardEntryMode mode;
     ConcurrentQueue<KeyboardAction> keyboardActionQueue;
 
-    void inputChar(KeyboardEntryMode modeAtInput, TextBlockModificationType entryType, int character, bool shiftPressed, bool ctrlPressed, bool altPressed);
-
-    // TODO: for mode safety
-    // std::mutex mutex;
+    void inputChar(GameMode modeAtInput, TextBlockModificationType entryType, int character, bool shiftPressed, bool ctrlPressed, bool altPressed);
 
     EntityManager &entityManager;
     ComponentManager &componentManager;
 };
 
-KeyboardInputSystem::KeyboardInputSystem(EntityManager &entityManager, ComponentManager &componentManager) : entityManager(entityManager), componentManager(componentManager) {}
-
-KeyboardInputSystem::KeyboardInputSystem(SystemLogger *logger, EntityManager &entityManager, ComponentManager &componentManager) : System(logger), entityManager(entityManager), componentManager(componentManager) {}
+KeyboardInputSystem::KeyboardInputSystem(EntityManager &entityManager, ComponentManager &componentManager, SystemLogger *logger) : System(logger), entityManager(entityManager), componentManager(componentManager) {}
 
 void KeyboardInputSystem::KeyPress(int character, bool shiftPressed, bool ctrlPressed, bool altPressed)
 {
+    auto mode = componentManager.GetComponent<GameStateComponent>(componentManager.GetEntityWithComponent<GameStateComponent>()).gameMode;
     keyboardActionQueue.Push(KeyboardAction(mode, PRESS, character, shiftPressed, ctrlPressed, altPressed));
 }
 
 void KeyboardInputSystem::Update(float deltaTime)
 {
+    auto mode = componentManager.GetComponent<GameStateComponent>(componentManager.GetEntityWithComponent<GameStateComponent>()).gameMode;
+
     KeyboardAction keyboardAction;
     while (keyboardActionQueue.TryPop(keyboardAction))
     {
@@ -98,11 +74,11 @@ void KeyboardInputSystem::Update(float deltaTime)
             switch (keyboardAction.character)
             {
             case GLFW_KEY_BACKSPACE:
-                inputChar(this->mode, DELETE, INT_MIN, keyboardAction.shiftPressed, keyboardAction.ctrlPressed, keyboardAction.altPressed);
+                inputChar(mode, DELETE, INT_MIN, keyboardAction.shiftPressed, keyboardAction.ctrlPressed, keyboardAction.altPressed);
                 displayAs = "DELETE";
                 break;
             default:
-                inputChar(this->mode, CHARACTER, keyboardAction.character, keyboardAction.shiftPressed, keyboardAction.ctrlPressed, keyboardAction.altPressed);
+                inputChar(mode, CHARACTER, keyboardAction.character, keyboardAction.shiftPressed, keyboardAction.ctrlPressed, keyboardAction.altPressed);
 
                 // Map the key to a character, considering shift modifier for uppercase
                 displayAs = keyboardAction.shiftPressed ? getShiftedChar(keyboardAction.character) : getChar(keyboardAction.character);
@@ -131,8 +107,10 @@ void KeyboardInputSystem::Update(float deltaTime)
     }
 }
 
-void KeyboardInputSystem::inputChar(KeyboardEntryMode modeAtInput, TextBlockModificationType entryType, int character, bool shiftPressed, bool ctrlPressed, bool altPressed)
+void KeyboardInputSystem::inputChar(GameMode modeAtInput, TextBlockModificationType entryType, int character, bool shiftPressed, bool ctrlPressed, bool altPressed)
 {
+    auto &mode = componentManager.GetComponent<GameStateComponent>(componentManager.GetEntityWithComponent<GameStateComponent>());
+
     std::string c;
     if (entryType == CHARACTER)
         c = getChar(character);
@@ -140,20 +118,20 @@ void KeyboardInputSystem::inputChar(KeyboardEntryMode modeAtInput, TextBlockModi
     // quick switch mode
     if (shiftPressed && c == " ")
     {
-        switch (mode)
+        switch (mode.gameMode)
         {
         case FREE_TYPE:
-            mode = ENTITY_MANAGEMENT;
+            mode.gameMode = ENTITY_MANAGEMENT;
             break;
         case ENTITY_MANAGEMENT:
-            mode = ROAM;
+            mode.gameMode = ROAM;
             break;
         case ROAM:
-            mode = FREE_TYPE;
+            mode.gameMode = FREE_TYPE;
             break;
         }
 
-        std::string formattedString = "switched to " + modeToString(mode) + " mode";
+        std::string formattedString = "switched to " + modeToString(mode.gameMode) + " mode";
         Log(formattedString, "log_input_logger");
         return;
     }
@@ -180,7 +158,7 @@ void KeyboardInputSystem::inputChar(KeyboardEntryMode modeAtInput, TextBlockModi
             }
         }
 
-    if (mode == FREE_TYPE && modeAtInput == FREE_TYPE)
+    if (mode.gameMode == FREE_TYPE && modeAtInput == FREE_TYPE)
     {
         // enter means lock text block from appends
         // TODO: should probably handle this at the top of method
@@ -192,6 +170,7 @@ void KeyboardInputSystem::inputChar(KeyboardEntryMode modeAtInput, TextBlockModi
             {
                 componentManager.RemoveComponent<InFocusComponent>(entity);
             }
+            return;
         }
 
         std::string realC = shiftPressed ? getShiftedChar(character) : getChar(character);
@@ -219,7 +198,7 @@ void KeyboardInputSystem::inputChar(KeyboardEntryMode modeAtInput, TextBlockModi
             }
         }
     }
-    else if (mode == ENTITY_MANAGEMENT)
+    else if (mode.gameMode == ENTITY_MANAGEMENT)
     {
         // shift + n = new non-text visible entity, EntityManagementSubMode.NEW_ENTITY
         // if ENTER in EntityManagementSubMode.NEW_ENTITY mode, create copy of last (base) entity in center
